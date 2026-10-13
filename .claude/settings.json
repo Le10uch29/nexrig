@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/Shadow Monarch/Desktop/frilans/nexrig/components/builder/scene/**)",
+      "mcp__plugin_playwright_playwright__browser_click",
+      "mcp__plugin_playwright_playwright__browser_wait_for",
+      "mcp__plugin_playwright_playwright__browser_console_messages",
+      "mcp__plugin_playwright_playwright__browser_evaluate",
+      "PowerShell(npx tsc --noEmit 2>&1)",
+      "PowerShell(npx eslint . 2>&1)",
+      "PowerShell(\\(Get-Item app\\\\globals.css\\).LastWriteTime = Get-Date; Start-Sleep -Seconds 3; \"touched\")",
+      "PowerShell(npx next start --port 3200)",
+      "PowerShell(npx eslint components features lib 2>&1)"
+    ]
+  }
+}
