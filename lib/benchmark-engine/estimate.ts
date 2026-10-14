@@ -1,37 +1,117 @@
+import { hardwareRepository } from "@/lib/hardware/repository";
 import type {
   BenchmarkRecord,
   Confidence,
+  FrameGenTech,
   Game,
   GameSettings,
   GraphicsPreset,
+  ModelBreakdown,
   PerformanceResult,
   Resolution,
+  Upscaler,
   UpscalingMode,
 } from "@/types/benchmark";
-import type { CpuSpec, GpuSpec } from "@/types/hardware";
+import type { CpuSpec, GpuSpec, MemoryType } from "@/types/hardware";
 
 /**
- * Relative-performance estimation model, v0.1.
+ * Relative-performance estimation model, v0.2.
  *
  *   gpuFps = game.gpuFps1440High × (gpu.index / 100) × res × preset × upscaling × RT × VRAM
- *   cpuFps = game.cpuFpsCap × (cpu.gamingIndex / 100) × presetCpu
+ *   cpuFps = game.cpuFpsCap × (cpu.gamingIndex / 100) × presetCpu × memory
  *   avg    = smooth-min(gpuFps, cpuFps)
  *
  * All constants are hand-set approximations. Output is labelled "estimate" with ±25% uncertainty
- * and low confidence. It is never presented as a measurement.
+ * and low confidence, or "calibrated" when real records of the same GPU and game exist.
+ * It is never presented as a measurement.
  */
-export const MODEL_VERSION = "relative-index v0.1";
+export const MODEL_VERSION = "relative-index v0.2";
 
 export const RESOLUTION_FACTOR: Record<Resolution, number> = { "1080p": 1.38, "1440p": 1, "4K": 0.52 };
 export const PRESET_FACTOR: Record<GraphicsPreset, number> = { low: 1.75, medium: 1.35, high: 1, ultra: 0.82 };
 const PRESET_CPU_FACTOR: Record<GraphicsPreset, number> = { low: 1.1, medium: 1.05, high: 1, ultra: 0.97 };
 export const UPSCALING_FACTOR: Record<UpscalingMode, number> = { off: 1, quality: 1.3, balanced: 1.45, performance: 1.65 };
+/** Presented-frame multiplier for 2× frame generation (interpolation has overhead). */
+const FRAME_GEN_FACTOR = 1.75;
 const UNCERTAINTY = 0.25;
+const CALIBRATED_UNCERTAINTY = 0.15;
+
+export interface MemoryConfig {
+  type: MemoryType;
+  speedMtps: number;
+  modules: number;
+}
 
 function smoothMin(a: number, b: number) {
-  // p-norm style blend: close to min() when the values differ a lot, slightly below both when similar.
+  // p-norm blend: close to min() when the values differ a lot, slightly below both when similar.
   const k = 6;
   return Math.pow(Math.pow(a, -k) + Math.pow(b, -k), -1 / k);
+}
+
+/** Upscalers usable in this game on this GPU (DLSS needs RTX; XeSS DP4a is not on Polaris/Vega). */
+export function availableUpscalers(game: Game, gpu: GpuSpec | undefined): Upscaler[] {
+  if (!gpu) return [];
+  return game.upscalers.filter((u) => gpu.upscalers.includes(u));
+}
+
+/** Frame generation usable in this game on this GPU. DLSS FG needs RTX 40/50; FSR FG needs RDNA or RTX. */
+export function availableFrameGen(game: Game, gpu: GpuSpec | undefined): FrameGenTech | null {
+  if (!gpu) return null;
+  if (game.frameGen.includes("DLSS-FG") && gpu.chipVendor === "NVIDIA" && (gpu.architecture === "Ada Lovelace" || gpu.architecture === "Blackwell")) return "DLSS-FG";
+  const fsrCapable = gpu.chipVendor === "AMD" ? gpu.architecture.startsWith("RDNA") : gpu.rayTracing;
+  if (game.frameGen.includes("FSR-FG") && fsrCapable) return "FSR-FG";
+  return null;
+}
+
+/** Settings actually applied: unsupported options are switched off with an explanation. */
+export function effectiveSettings(game: Game, gpu: GpuSpec, settings: GameSettings) {
+  const notes: string[] = [];
+  const rt = settings.rayTracing && game.supportsRayTracing && gpu.rayTracing;
+  if (settings.rayTracing && !game.supportsRayTracing) notes.push("Игра не поддерживает трассировку лучей — расчёт без RT.");
+  else if (settings.rayTracing && !gpu.rayTracing) notes.push(`${gpu.chip} не имеет аппаратной трассировки лучей — расчёт без RT.`);
+
+  const ups = availableUpscalers(game, gpu);
+  let upscaler: Upscaler | null = null;
+  let upscaling: UpscalingMode = "off";
+  if (settings.upscaling !== "off") {
+    upscaler = settings.upscaler && ups.includes(settings.upscaler) ? settings.upscaler : (ups[0] ?? null);
+    if (upscaler) upscaling = settings.upscaling;
+    else notes.push("Выбранный апскейлер не поддерживается этой парой игра/видеокарта — расчёт без апскейлинга.");
+    if (settings.upscaler && upscaler && upscaler !== settings.upscaler) notes.push(`${settings.upscaler} недоступен для этой пары — использован ${upscaler}.`);
+  }
+
+  const fgTech = availableFrameGen(game, gpu);
+  const frameGen = Boolean(settings.frameGen && fgTech);
+  if (settings.frameGen && !fgTech) notes.push("Генерация кадров недоступна для этой игры или видеокарты.");
+
+  return { rt, upscaler, upscaling, frameGen: frameGen ? fgTech : null, notes };
+}
+
+/** CPU-side memory factor (model assumption) and an explanation. */
+function memoryFactor(cpu: CpuSpec, memory: MemoryConfig | undefined): { factor: number; notes: string[] } {
+  if (!memory) return { factor: 1, notes: ["Конфигурация памяти неизвестна — принят двухканальный режим на официальной частоте."] };
+  const notes: string[] = [];
+  let factor = 1;
+  if (memory.modules === 1) {
+    factor *= 0.85;
+    notes.push("Один модуль памяти (одноканальный режим): CPU-предел снижен на 15%.");
+  } else if (memory.modules === 3) {
+    factor *= 0.95;
+    notes.push("Три модуля памяти (несимметричные каналы): CPU-предел снижен на 5%.");
+  }
+  const jedec = cpu.memorySpeedMtps?.[memory.type];
+  if (jedec) {
+    const delta = Math.max(-0.08, Math.min(0.05, (memory.speedMtps / jedec - 1) * 0.15));
+    if (Math.abs(delta) >= 0.005) {
+      factor *= 1 + delta;
+      notes.push(`Память ${memory.speedMtps} МТ/с относительно официальных ${jedec} МТ/с: ${delta > 0 ? "+" : ""}${Math.round(delta * 100)}% к CPU-пределу (при работающем XMP/EXPO).`);
+    }
+  }
+  if (memory.type === "DDR4" && cpu.memorySupport.includes("DDR5")) {
+    factor *= 0.94;
+    notes.push("DDR4 на платформе с поддержкой DDR5: CPU-предел снижен на 6%.");
+  }
+  return { factor, notes };
 }
 
 export interface EstimateInput {
@@ -39,34 +119,23 @@ export interface EstimateInput {
   cpu: CpuSpec;
   gpu: GpuSpec;
   settings: GameSettings;
+  memory?: MemoryConfig;
 }
 
-export function estimateFps({ game, cpu, gpu, settings }: EstimateInput): Extract<PerformanceResult, { kind: "estimated" }> {
-  const assumptions: string[] = [];
-  const rt = settings.rayTracing && game.supportsRayTracing && gpu.rayTracing;
-  if (settings.rayTracing && game.supportsRayTracing && !gpu.rayTracing) {
-    assumptions.push(`${gpu.chip} не имеет аппаратной трассировки лучей — расчёт без RT.`);
-  }
-  const index = rt ? gpu.rtIndex : gpu.rasterIndex;
-  const upscale =
-    settings.upscaling !== "off" && gpu.upscalers.some((u) => game.upscalers.includes(u)) ? settings.upscaling : "off";
-
-  if (settings.upscaling !== "off" && upscale === "off") {
-    assumptions.push("Выбранный апскейлер не поддерживается этой парой игра/видеокарта — расчёт без апскейлинга.");
-  }
-  if (settings.rayTracing && !game.supportsRayTracing) {
-    assumptions.push("Игра не поддерживает трассировку лучей — расчёт без RT.");
-  }
+export function estimateFps({ game, cpu, gpu, settings, memory }: EstimateInput): Extract<PerformanceResult, { kind: "estimated" }> {
+  const eff = effectiveSettings(game, gpu, settings);
+  const assumptions = [...eff.notes];
+  const index = eff.rt ? gpu.rtIndex : gpu.rasterIndex;
 
   let gpuFps =
     game.model.gpuFps1440High *
     (index / 100) *
     RESOLUTION_FACTOR[settings.resolution] *
     PRESET_FACTOR[settings.preset] *
-    UPSCALING_FACTOR[upscale] *
-    (rt ? game.model.rtCost : 1);
+    UPSCALING_FACTOR[eff.upscaling] *
+    (eff.rt ? game.model.rtCost : 1);
 
-  const vramNeed = settings.resolution === "4K" ? 12 : settings.resolution === "1440p" && (settings.preset === "ultra" || rt) ? 10 : settings.preset === "low" ? 4 : 6;
+  const vramNeed = settings.resolution === "4K" ? 12 : settings.resolution === "1440p" && (settings.preset === "ultra" || eff.rt) ? 10 : settings.preset === "low" ? 4 : 6;
   if (gpu.vramGb < vramNeed) {
     // Larger shortfalls hurt more (texture streaming / swapping over PCIe).
     const penalty = gpu.vramGb <= vramNeed / 2 ? 0.6 : 0.8;
@@ -74,16 +143,19 @@ export function estimateFps({ game, cpu, gpu, settings }: EstimateInput): Extrac
     assumptions.push(`Видеопамяти ${gpu.vramGb} ГБ может не хватать для этих настроек — применён штраф −${Math.round((1 - penalty) * 100)}%.`);
   }
 
-  const cpuFps = game.model.cpuFpsCap * (cpu.gamingIndex / 100) * PRESET_CPU_FACTOR[settings.preset];
+  const mem = memoryFactor(cpu, memory);
+  assumptions.push(...mem.notes);
+  const cpuFps = game.model.cpuFpsCap * (cpu.gamingIndex / 100) * PRESET_CPU_FACTOR[settings.preset] * mem.factor;
   const avg = smoothMin(gpuFps, cpuFps);
   const ratio = gpuFps / cpuFps;
   const bottleneck = ratio < 0.85 ? "gpu" : ratio > 1.15 ? "cpu" : "balanced";
 
   assumptions.push(
     "Индексы производительности CPU/GPU и базовые FPS игры — параметры модели, а не результаты тестов.",
-    "Предполагается двухканальная память, актуальные драйверы и сцена средней нагрузки.",
+    "Предполагаются актуальные драйверы и сцена средней нагрузки.",
   );
-  if (upscale !== "off") assumptions.push("Генерация кадров не учитывается.");
+  if (eff.upscaler) assumptions.push(`Апскейлинг: ${eff.upscaler}, режим «${eff.upscaling}» — прирост задан коэффициентом модели.`);
+  if (eff.frameGen) assumptions.push(`${eff.frameGen}: показанный FPS включает сгенерированные кадры; задержка ввода соответствует базовому FPS.`);
 
   const round = (n: number) => Math.max(1, Math.round(n));
   return {
@@ -91,7 +163,11 @@ export function estimateFps({ game, cpu, gpu, settings }: EstimateInput): Extrac
     avgFps: round(avg),
     low1Fps: round(avg * game.model.lowRatio),
     rangeFps: [round(avg * (1 - UNCERTAINTY)), round(avg * (1 + UNCERTAINTY))],
+    gpuBoundFps: round(gpuFps),
+    cpuBoundFps: round(cpuFps),
     bottleneck,
+    utilization: { gpu: Math.min(1, avg / gpuFps), cpu: Math.min(1, avg / cpuFps) },
+    frameGenFps: eff.frameGen ? round(avg * FRAME_GEN_FACTOR) : null,
     confidence: "low",
     method: MODEL_VERSION,
     assumptions,
@@ -99,14 +175,19 @@ export function estimateFps({ game, cpu, gpu, settings }: EstimateInput): Extrac
 }
 
 function sameSettings(a: GameSettings, b: GameSettings) {
-  return a.resolution === b.resolution && a.preset === b.preset && a.rayTracing === b.rayTracing && a.upscaling === b.upscaling;
+  return (
+    a.resolution === b.resolution &&
+    a.preset === b.preset &&
+    a.rayTracing === b.rayTracing &&
+    a.upscaling === b.upscaling &&
+    (a.upscaling === "off" || (a.upscaler ?? null) === (b.upscaler ?? null)) &&
+    Boolean(a.frameGen) === Boolean(b.frameGen)
+  );
 }
 
 /** Exact-match measured records for this CPU/GPU/game/settings. */
 export function findMeasured(records: BenchmarkRecord[], q: { gameId: string; cpuId: string; gpuId: string; settings: GameSettings }) {
-  return records.filter(
-    (r) => r.gameId === q.gameId && r.cpuId === q.cpuId && r.gpuId === q.gpuId && sameSettings(r.settings, q.settings),
-  );
+  return records.filter((r) => r.gameId === q.gameId && r.cpuId === q.cpuId && r.gpuId === q.gpuId && sameSettings(r.settings, q.settings));
 }
 
 function measuredConfidence(records: BenchmarkRecord[]): Confidence {
@@ -116,23 +197,26 @@ function measuredConfidence(records: BenchmarkRecord[]): Confidence {
   return "low";
 }
 
+const median = (xs: number[]) => {
+  const s = [...xs].sort((a, b) => a - b);
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+};
+
 export interface PerformanceQuery {
   game: Game | undefined;
   cpu: CpuSpec | undefined;
   gpu: GpuSpec | undefined;
   settings: GameSettings;
   measured: BenchmarkRecord[];
+  memory?: MemoryConfig;
 }
 
-/** Measured data wins; otherwise a labelled estimate; otherwise an explicit "unavailable". */
-export function getPerformance({ game, cpu, gpu, settings, measured }: PerformanceQuery): PerformanceResult {
+/** Measured data wins; then a model calibrated on real records; then a model estimate; else "unavailable". */
+export function getPerformance({ game, cpu, gpu, settings, measured, memory }: PerformanceQuery): PerformanceResult {
   if (!game) return { kind: "unavailable", reason: "Игра не выбрана." };
-  if (!cpu) return { kind: "unavailable", reason: "В сборке нет процессора — оценка невозможна." };
-  if (!gpu)
-    return {
-      kind: "unavailable",
-      reason: "В сборке нет дискретной видеокарты. Модель не оценивает встроенную графику.",
-    };
+  if (!cpu) return { kind: "unavailable", reason: "Недостаточно данных для точной оценки: в сборке нет процессора." };
+  if (!gpu) return { kind: "unavailable", reason: "Недостаточно данных для точной оценки: в сборке нет дискретной видеокарты (встроенная графика моделью не оценивается)." };
 
   const matches = findMeasured(measured, { gameId: game.id, cpuId: cpu.id, gpuId: gpu.id, settings });
   if (matches.length) {
@@ -148,5 +232,54 @@ export function getPerformance({ game, cpu, gpu, settings, measured }: Performan
       confidence: measuredConfidence(matches),
     };
   }
-  return estimateFps({ game, cpu, gpu, settings });
+
+  const estimate = estimateFps({ game, cpu, gpu, settings, memory });
+
+  // Calibration: real records of the same GPU in this game (any CPU/settings) correct the model.
+  const anchors = measured.filter((r) => r.gameId === game.id && r.gpuId === gpu.id);
+  const ratios = anchors
+    .map((r) => {
+      const rCpu = hardwareRepository.byId(r.cpuId);
+      if (!rCpu || rCpu.category !== "cpu") return null;
+      const modelled = estimateFps({ game, cpu: rCpu, gpu, settings: r.settings }).avgFps;
+      return r.avgFps / modelled;
+    })
+    .filter((x): x is number => x !== null && Number.isFinite(x));
+  if (ratios.length) {
+    const k = Math.max(0.5, Math.min(1.8, median(ratios)));
+    const round = (n: number) => Math.max(1, Math.round(n));
+    const avg = estimate.avgFps * k;
+    // Copy the breakdown without the "estimated" tag — the tier is set explicitly below.
+    const { kind: _estimatedKind, ...breakdown } = estimate;
+    void _estimatedKind;
+    const calibrated: ModelBreakdown = {
+      ...breakdown,
+      avgFps: round(avg),
+      low1Fps: round(estimate.low1Fps * k),
+      rangeFps: [round(avg * (1 - CALIBRATED_UNCERTAINTY)), round(avg * (1 + CALIBRATED_UNCERTAINTY))],
+      gpuBoundFps: round(estimate.gpuBoundFps * k),
+      frameGenFps: estimate.frameGenFps ? round(estimate.frameGenFps * k) : null,
+      confidence: "medium",
+      method: `${MODEL_VERSION}, калибровка по ${ratios.length} замер(ам) этой видеокарты в игре (коэффициент ${k.toFixed(2)})`,
+      assumptions: [...estimate.assumptions, "Оценка скорректирована по реальным замерам той же видеокарты в этой игре при других настройках или с другим CPU."],
+    };
+    return { ...calibrated, kind: "calibrated", calibrationRecords: ratios.length };
+  }
+  return estimate;
+}
+
+export type TargetVerdict = "meets" | "borderline" | "misses";
+
+/** Whether a result sustains a target FPS: uses the lower bound of the range when known. */
+export function targetVerdict(result: PerformanceResult, target: number): TargetVerdict | null {
+  if (result.kind === "unavailable") return null;
+  const low = result.rangeFps ? result.rangeFps[0] : result.avgFps;
+  if (low >= target) return "meets";
+  if (result.avgFps >= target * 0.95) return "borderline";
+  return "misses";
+}
+
+/** Memory configuration of a build for the estimator. */
+export function memoryOf(ram: { type: MemoryType; speedMtps: number } | undefined, modules: number): MemoryConfig | undefined {
+  return ram ? { type: ram.type, speedMtps: ram.speedMtps, modules } : undefined;
 }

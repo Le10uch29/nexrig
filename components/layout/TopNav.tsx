@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useSavedBuilds } from "@/features/build-state/saved-builds";
 import { useBuildStore } from "@/features/build-state/store";
+import { CURRENCIES, RATES_AS_OF, RUB_PER_UNIT, useCurrencyStore } from "@/features/settings/currency";
 import { useMessages } from "@/lib/i18n";
 import { IconArrowUp, IconCube, IconDatabase, IconGauge, IconMenu, IconSpark, IconUser } from "@/components/ui/icons";
 import { cx } from "@/components/ui/primitives";
@@ -63,6 +64,7 @@ export function TopNav() {
         </nav>
         <div className="ml-auto flex items-center gap-2">
           <GlobalSearch />
+          <CurrencySwitch />
           <ProfileMenu />
           <button
             type="button"
@@ -94,6 +96,33 @@ export function TopNav() {
         </nav>
       )}
     </header>
+  );
+}
+
+/** Display currency: RUB / USD / GEL at fixed reference rates. */
+function CurrencySwitch() {
+  const currency = useCurrencyStore((s) => s.currency);
+  const setCurrency = useCurrencyStore((s) => s.setCurrency);
+  const hint = `Цены ориентировочные. Пересчёт из рублей по фиксированному курсу на ${RATES_AS_OF}: 1 $ = ${RUB_PER_UNIT.USD} ₽, 1 ₾ = ${RUB_PER_UNIT.GEL} ₽.`;
+  return (
+    <div role="radiogroup" aria-label="Валюта цен" title={hint} className="flex h-9 items-center rounded-[var(--radius-md)] border border-line bg-panel p-0.5">
+      {CURRENCIES.map((c) => (
+        <button
+          key={c.id}
+          type="button"
+          role="radio"
+          aria-checked={currency === c.id}
+          aria-label={c.label}
+          onClick={() => setCurrency(c.id)}
+          className={cx(
+            "num h-7 min-w-7 rounded-[calc(var(--radius-md)-3px)] px-1.5 text-[13px] font-semibold transition-colors",
+            currency === c.id ? "bg-panel-3 text-fg shadow-[0_0_0_1px_var(--line-strong)]" : "text-fg-3 hover:text-fg",
+          )}
+        >
+          {c.symbol}
+        </button>
+      ))}
+    </div>
   );
 }
 

@@ -35,7 +35,7 @@ export function SceneLabels() {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
       <SceneLabel id="bench">
-        <span className="text-[10px] font-semibold tracking-[0.12em] whitespace-nowrap text-[#9fd0dc] uppercase">Коврик сборки</span>
+        <span className="text-[10px] font-semibold tracking-[0.12em] whitespace-nowrap text-fg-3 uppercase">Коврик сборки</span>
       </SceneLabel>
       {placements
         .filter((p) => p.category !== "case")

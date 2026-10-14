@@ -8,6 +8,7 @@ import { useBuildStore } from "@/features/build-state/store";
 import { evaluateCandidate, type CandidateVerdict } from "@/features/compatibility/engine";
 import { hardwareRepository } from "@/lib/hardware/repository";
 import { perfKey } from "@/lib/hardware/specs";
+import { collapseColorVariants, colorVariantsOf } from "@/lib/hardware/variants";
 import { useMessages } from "@/lib/i18n";
 import { CATEGORY_ORDER, type ComponentCategory, type HardwareComponent } from "@/types/hardware";
 import { ComponentCard } from "@/components/hardware/ComponentCard";
@@ -65,6 +66,9 @@ export function CatalogPanel() {
   const selection = useBuildStore((s) => s.selection);
   const openCatalog = useBuildStore((s) => s.openCatalog);
   const removeComponent = useBuildStore((s) => s.removeComponent);
+  const setComponent = useBuildStore((s) => s.setComponent);
+  // Colour picked per product group (before installing).
+  const [colorPick, setColorPick] = useState<Record<string, string>>({});
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<Sort>("price-asc");
   const [onlyCompatible, setOnlyCompatible] = useState(false);
@@ -94,7 +98,7 @@ export function CatalogPanel() {
   }, [all, selection]);
   const isOk = (c: HardwareComponent) => {
     const s = verdicts.get(c.id)?.status;
-    return s === "compatible" || s === "unchecked" || s === "verify";
+    return s === "compatible" || s === "unchecked" || s === "warning";
   };
 
   const facets = FACETS[category];
@@ -104,9 +108,12 @@ export function CatalogPanel() {
 
   const scoped = useMemo(() => {
     const base = searching ? all.filter((c) => `${c.brand} ${c.model} ${c.name}`.toLowerCase().includes(q.trim().toLowerCase())) : applyFacetPath(category, all, state.path);
-    return onlyCompatible ? base.filter(isOk) : base;
+    const filtered = onlyCompatible ? base.filter(isOk) : base;
+    // Colour editions show as one card with a colour switch: installed colour, else the picked one.
+    const installedIds = new Set(category === "storage" ? selection.storage : [selection[category] ?? ""]);
+    return collapseColorVariants(filtered, (group) => filtered.find((c) => c.variantGroup === group && installedIds.has(c.id))?.id ?? colorPick[group]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [all, searching, q, category, state.path, onlyCompatible, verdicts]);
+  }, [all, searching, q, category, state.path, onlyCompatible, verdicts, colorPick, selection]);
 
   const options = atStep ? facetOptions(facets[stepIndex], scoped, isOk) : [];
 
@@ -261,6 +268,12 @@ export function CatalogPanel() {
                   actionLabel={category === "storage" ? t.catalog.add : hasCurrent ? t.catalog.replace : t.catalog.install}
                   onInstall={() => requestInstall(c)}
                   onRemove={() => removeComponent(category, c.id)}
+                  variants={colorVariantsOf(c)}
+                  onPickVariant={(v) => {
+                    // Installed product: swap the colour in place; otherwise just show the other edition.
+                    if (installed && category !== "storage") setComponent(v, { instant: true });
+                    setColorPick((p) => ({ ...p, [v.variantGroup!]: v.id }));
+                  }}
                 />
               );
             })}

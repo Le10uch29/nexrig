@@ -50,38 +50,39 @@ const until = (year: number) => (c: GpuChip) => c.year <= year;
 const notVega = (c: GpuChip) => c.series !== "RX Vega";
 
 const LINES: GpuLine[] = [
-  { brand: "Sapphire", line: "Nitro+", tier: "premium", color: "#1b1c20", accent: "#3a8fd8", covers: notVega },
+  { brand: "Sapphire", line: "Nitro+", tier: "premium", rgb: true, color: "#1b1c20", accent: "#3a8fd8", covers: notVega },
   { brand: "Sapphire", line: "Pulse", tier: "entry", color: "#1b1c20", accent: "#d0d3da", covers: notVega },
-  { brand: "PowerColor", line: "Red Devil", tier: "premium", color: "#151518", accent: "#d21f2b", covers: (c) => notVega(c) && c.tbpW >= 150 },
-  { brand: "PowerColor", line: "Hellhound", tier: "mid", color: "#1d1e22", accent: "#6aa8ff", covers: since(2022), lineName: () => "Hellhound" },
+  { brand: "PowerColor", line: "Red Devil", tier: "premium", rgb: true, color: "#151518", accent: "#d21f2b", covers: (c) => notVega(c) && c.tbpW >= 150 },
+  { brand: "PowerColor", line: "Hellhound", tier: "mid", rgb: true, color: "#1d1e22", accent: "#6aa8ff", covers: since(2022), lineName: () => "Hellhound" },
   { brand: "PowerColor", line: "Red Dragon", tier: "mid", color: "#1d1e22", accent: "#d21f2b", covers: (c) => c.year < 2022 && notVega(c) },
-  { brand: "ASUS", line: "ROG Strix", tier: "premium", color: "#1f2126", accent: "#c4304a", covers: until(2022) },
-  { brand: "ASUS", line: "TUF Gaming", tier: "mid", color: "#2a2b2f", accent: "#9aa0aa", covers: since(2020) },
+  { brand: "ASUS", line: "ROG Strix", tier: "premium", rgb: true, color: "#1f2126", accent: "#c4304a", covers: until(2022) },
+  { brand: "ASUS", line: "TUF Gaming", tier: "mid", rgb: true, color: "#2a2b2f", accent: "#9aa0aa", covers: since(2020) },
   { brand: "ASUS", line: "Dual", tier: "entry", color: "#25272c", accent: "#c9ccd2", covers: (c) => c.tbpW <= 230 && notVega(c) },
-  { brand: "MSI", line: "Gaming X", tier: "mid", color: "#1c1d21", accent: "#d23a3a", covers: (c) => until(2024)(c) && notVega(c), lineName: (c) => (c.tbpW >= 250 ? "Gaming X Trio" : "Gaming X") },
-  { brand: "Gigabyte", line: "Gaming OC", tier: "mid", color: "#202226", accent: "#f5a623", covers: all },
-  { brand: "XFX", line: "Speedster MERC", tier: "premium", color: "#16171a", accent: "#b9bcc4", covers: (c) => since(2020)(c) && c.tbpW >= 200 },
+  { brand: "MSI", line: "Gaming X", tier: "mid", rgb: true, color: "#1c1d21", accent: "#d23a3a", covers: (c) => until(2024)(c) && notVega(c), lineName: (c) => (c.tbpW >= 250 ? "Gaming X Trio" : "Gaming X") },
+  { brand: "Gigabyte", line: "Gaming OC", tier: "mid", rgb: true, color: "#202226", accent: "#f5a623", covers: all },
+  { brand: "XFX", line: "Speedster MERC", tier: "premium", rgb: true, color: "#16171a", accent: "#b9bcc4", covers: (c) => since(2020)(c) && c.tbpW >= 200 },
   { brand: "XFX", line: "Speedster SWFT", tier: "entry", color: "#202125", accent: "#b9bcc4", covers: since(2020) },
 ];
 
 const REF = { brand: "AMD", line: "Reference", color: "#1d1e22", accent: "#c4304a" };
 const REFS: ReferenceCard[] = [
-  { chip: "RX Vega 56", lengthMm: 267, slots: 2 },
-  { chip: "RX Vega 64", lengthMm: 267, slots: 2 },
-  { chip: "Radeon VII", lengthMm: 268, slots: 2.5 },
-  { chip: "RX 5700", lengthMm: 268, slots: 2 },
-  { chip: "RX 5700 XT", lengthMm: 268, slots: 2 },
-  { chip: "RX 6700 XT", lengthMm: 267, slots: 2 },
-  { chip: "RX 6800", lengthMm: 267, slots: 2 },
-  { chip: "RX 6800 XT", lengthMm: 267, slots: 2.5 },
-  { chip: "RX 6900 XT", lengthMm: 267, slots: 2.5 },
-  { chip: "RX 6950 XT", lengthMm: 267, slots: 2.5 },
-  { chip: "RX 7600", lengthMm: 204, slots: 2 },
-  { chip: "RX 7700 XT", lengthMm: 267, slots: 2 },
-  { chip: "RX 7800 XT", lengthMm: 267, slots: 2 },
-  { chip: "RX 7900 GRE", lengthMm: 276, slots: 2.5 },
-  { chip: "RX 7900 XT", lengthMm: 276, slots: 2.5 },
-  { chip: "RX 7900 XTX", lengthMm: 287, slots: 2.5 },
+  // fans: 1 = blower reference design.
+  { chip: "RX Vega 56", lengthMm: 267, slots: 2, fans: 1 },
+  { chip: "RX Vega 64", lengthMm: 267, slots: 2, fans: 1 },
+  { chip: "Radeon VII", lengthMm: 268, slots: 2.5, fans: 3 },
+  { chip: "RX 5700", lengthMm: 268, slots: 2, fans: 1 },
+  { chip: "RX 5700 XT", lengthMm: 268, slots: 2, fans: 1 },
+  { chip: "RX 6700 XT", lengthMm: 267, slots: 2, fans: 2 },
+  { chip: "RX 6800", lengthMm: 267, slots: 2, fans: 3 },
+  { chip: "RX 6800 XT", lengthMm: 267, slots: 2.5, fans: 3 },
+  { chip: "RX 6900 XT", lengthMm: 267, slots: 2.5, fans: 3 },
+  { chip: "RX 6950 XT", lengthMm: 267, slots: 2.5, fans: 3 },
+  { chip: "RX 7600", lengthMm: 204, slots: 2, fans: 2 },
+  { chip: "RX 7700 XT", lengthMm: 267, slots: 2, fans: 2 },
+  { chip: "RX 7800 XT", lengthMm: 267, slots: 2, fans: 2 },
+  { chip: "RX 7900 GRE", lengthMm: 276, slots: 2.5, fans: 3 },
+  { chip: "RX 7900 XT", lengthMm: 276, slots: 2.5, fans: 3 },
+  { chip: "RX 7900 XTX", lengthMm: 287, slots: 2.5, fans: 3 },
 ].map((r) => ({ ...r, ...REF }) as ReferenceCard);
 
 export const GPU_AMD: GpuSpec[] = buildGpuCatalogue("AMD", CHIPS, LINES, REFS);

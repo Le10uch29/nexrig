@@ -1,13 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { usePrice } from "@/features/settings/currency";
 import { GAMES } from "@/data/games";
 import { useSavedBuilds } from "@/features/build-state/saved-builds";
 import { useBuildStore } from "@/features/build-state/store";
 import { checkBuild } from "@/features/compatibility/engine";
-import { getPerformance } from "@/lib/benchmark-engine/estimate";
+import { getPerformance, memoryOf } from "@/lib/benchmark-engine/estimate";
 import { resolveBuild, totalPrice } from "@/lib/hardware/repository";
-import { formatPrice, useMessages } from "@/lib/i18n";
+import { useMessages } from "@/lib/i18n";
 import type { BuildSelection } from "@/types/build";
 import { CATEGORY_ORDER } from "@/types/hardware";
 import { cx, EmptyState, Field, Select, StatusPill } from "@/components/ui/primitives";
@@ -15,6 +16,7 @@ import { cx, EmptyState, Field, Select, StatusPill } from "@/components/ui/primi
 const CURRENT = "__current__";
 
 export function ComparePanel() {
+  const formatPrice = usePrice();
   const t = useMessages();
   const builds = useSavedBuilds((s) => s.builds);
   const current = useBuildStore((s) => s.selection);
@@ -33,7 +35,7 @@ export function ComparePanel() {
     const one = (s: BuildSelection | null) => {
       if (!s) return null;
       const r = resolveBuild(s);
-      return { r, total: totalPrice(r), report: checkBuild(s), fps: getPerformance({ game, cpu: r.cpu, gpu: r.gpu, settings: perf.settings, measured: [] }) };
+      return { r, total: totalPrice(r), report: checkBuild(s), fps: getPerformance({ game, cpu: r.cpu, gpu: r.gpu, settings: perf.settings, measured: [], memory: memoryOf(r.ram, r.ramCount) }) };
     };
     return { a: one(A), b: one(B) };
   }, [A, B, game, perf.settings]);

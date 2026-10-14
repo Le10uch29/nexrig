@@ -6,13 +6,22 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 import { useBuildStore, type MotionState } from "@/features/build-state/store";
 import type { Pose } from "@/features/installation/anchors";
-import { EXPLODE_OFFSETS, installPath, profileFor, removalPath, type Keyframe } from "@/features/installation/motion";
+import { EXPLODE_OFFSETS, installPath, profileForPlacement, removalPath, type Keyframe } from "@/features/installation/motion";
 import type { Placement, PlacementState } from "@/features/installation/placement";
+import { assetFor } from "@/features/models/registry";
+import { AssetModel } from "./AssetModel";
 import { boundsFor, type LocalBounds } from "./bounds";
 import { LabelAnchor } from "./labels";
 import { CoolerModel, CpuModel, FanPackModel, GpuModel, MotherboardModel, PsuModel, RamModel, StorageModel } from "./models";
 
+/** GLB from the model registry when available, otherwise the procedural model. */
 function ModelFor({ p, spin }: { p: Placement; spin: boolean }) {
+  // Multi-part groups (RAM sticks, fan packs) and the AIO radiator stay procedural.
+  const asset = p.category === "ram" || p.category === "fans" || p.category === "cooler" ? undefined : assetFor(p.component);
+  return <AssetModel asset={asset} fallback={<ProceduralModel p={p} spin={spin} />} />;
+}
+
+function ProceduralModel({ p, spin }: { p: Placement; spin: boolean }) {
   const c = p.component;
   switch (c.category) {
     case "motherboard":
@@ -20,7 +29,7 @@ function ModelFor({ p, spin }: { p: Placement; spin: boolean }) {
     case "cpu":
       return <CpuModel spec={c} />;
     case "cooler":
-      return <CoolerModel spec={c} radiatorOffset={p.state === "mounted" ? p.radiatorOffset : undefined} spin={spin} />;
+      return <CoolerModel spec={c} radiator={p.state === "mounted" ? p.radiator : undefined} spin={spin} />;
     case "ram":
       return <RamModel spec={c} items={p.children ?? [{ offset: [0, 0, 0] }]} />;
     case "gpu":
@@ -164,7 +173,7 @@ export function SlotRenderer({ slotKey, placement, reducedMotion }: { slotKey: s
       pendingIntro.current = false;
       g.position.set(...p.bench.position);
       g.rotation.set(...p.bench.rotation);
-      const frames = p.state === "mounted" ? installPath(profileFor(p.component), p.bench, p.target) : [];
+      const frames = p.state === "mounted" ? installPath(profileForPlacement(p), p.bench, p.target) : [];
       run({ frames, kind: "installing", intro: true, onDone: () => onArrived(p) });
     } else {
       snap(p);
@@ -196,7 +205,7 @@ export function SlotRenderer({ slotKey, placement, reducedMotion }: { slotKey: s
         return;
       }
       run({
-        frames: removalPath(profileFor(cur.component), currentPose(g), cur.bench, lastState.current === "mounted"),
+        frames: removalPath(profileForPlacement(cur), currentPose(g), cur.bench, lastState.current === "mounted"),
         kind: "removing",
         outro: true,
         onDone: () => setDisplayed(undefined),
@@ -207,7 +216,7 @@ export function SlotRenderer({ slotKey, placement, reducedMotion }: { slotKey: s
     if (!cur || cur.component.id !== incoming.component.id) {
       if (cur && !instant && g) {
         run({
-          frames: removalPath(profileFor(cur.component), currentPose(g), cur.bench, lastState.current === "mounted"),
+          frames: removalPath(profileForPlacement(cur), currentPose(g), cur.bench, lastState.current === "mounted"),
           kind: "removing",
           outro: true,
           onDone: () => {
@@ -229,7 +238,7 @@ export function SlotRenderer({ slotKey, placement, reducedMotion }: { slotKey: s
       lastState.current = incoming.state;
       return;
     }
-    const profile = profileFor(incoming.component);
+    const profile = profileForPlacement(incoming);
     const from = currentPose(g);
     let frames: Keyframe[];
     if (incoming.state === "mounted" && lastState.current === "mounted") {

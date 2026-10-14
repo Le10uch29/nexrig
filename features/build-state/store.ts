@@ -49,7 +49,7 @@ interface BuildState {
   activity: ActivityEntry[];
   skipNonce: number;
   cameraNonce: number;
-  perf: { gameId: string; settings: GameSettings };
+  perf: { gameId: string; settings: GameSettings; targetFps?: number };
 
   setComponent: (component: HardwareComponent, opts?: { instant?: boolean; ramCount?: number }) => void;
   /** Change how many memory modules are installed (1…board slots). */
@@ -70,7 +70,7 @@ interface BuildState {
   log: (kind: ActivityEntry["kind"], text: string) => void;
   skipAnimations: () => void;
   resetCamera: () => void;
-  setPerf: (patch: Partial<{ gameId: string; settings: Partial<GameSettings> }>) => void;
+  setPerf: (patch: Partial<{ gameId: string; settings: Partial<GameSettings>; targetFps: number }>) => void;
 }
 
 const ALL_INSTANT: BuildState["changeMeta"] = {};
@@ -102,14 +102,15 @@ export const useBuildStore = create<BuildState>()(
       focusComponentId: null,
       selectedSlot: null,
       hoveredSlot: null,
-      view: { exploded: false, caseMode: "glass", labels: true },
+      view: { exploded: false, caseMode: "glass", labels: false },
       motion: {},
       activity: [],
       skipNonce: 0,
       cameraNonce: 0,
       perf: {
         gameId: "cyberpunk-2077",
-        settings: { resolution: "1440p", preset: "high", rayTracing: false, upscaling: "off" },
+        settings: { resolution: "1440p", preset: "high", rayTracing: false, upscaling: "off", upscaler: null, frameGen: false },
+        targetFps: 144,
       },
 
       setComponent: (component, opts) => {
@@ -217,6 +218,7 @@ export const useBuildStore = create<BuildState>()(
           perf: {
             gameId: patch.gameId ?? s.perf.gameId,
             settings: { ...s.perf.settings, ...patch.settings },
+            targetFps: patch.targetFps ?? s.perf.targetFps ?? 144,
           },
         })),
     }),

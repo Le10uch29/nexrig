@@ -69,13 +69,13 @@ export function IconButton({
 export const STATUS_STYLE: Record<CheckStatus | "unchecked", { cls: string; dot: string }> = {
   compatible: { cls: "text-ok bg-ok-soft border-ok/25", dot: "bg-ok" },
   incompatible: { cls: "text-bad bg-bad-soft border-bad/30", dot: "bg-bad" },
-  verify: { cls: "text-warn bg-warn-soft border-warn/30", dot: "bg-warn" },
-  insufficient: { cls: "text-fg-2 bg-info-soft border-line-strong", dot: "bg-fg-3" },
+  warning: { cls: "text-warn bg-warn-soft border-warn/30", dot: "bg-warn" },
+  unknown: { cls: "text-fg-2 bg-info-soft border-line-strong", dot: "bg-fg-3" },
   unchecked: { cls: "text-fg-3 bg-transparent border-line", dot: "bg-fg-3" },
 };
 
 export function StatusIcon({ status, className }: { status: CheckStatus; className?: string }) {
-  const Icon = status === "compatible" ? IconCheck : status === "incompatible" ? IconX : status === "verify" ? IconAlert : IconHelp;
+  const Icon = status === "compatible" ? IconCheck : status === "incompatible" ? IconX : status === "warning" ? IconAlert : IconHelp;
   return <Icon className={className} />;
 }
 

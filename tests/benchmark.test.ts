@@ -46,7 +46,8 @@ describe("benchmark engine", () => {
     expect(r.kind).toBe("measured");
     if (r.kind === "measured") expect(r.avgFps).toBe(101);
     const other = getPerformance({ game, cpu, gpu, settings: { ...settings, preset: "ultra" }, measured: [record] });
-    expect(other.kind).toBe("estimated");
+    // Same GPU and game, other preset: the model is calibrated by the record, not presented as measured.
+    expect(other.kind).toBe("calibrated");
   });
 
   it("falls back to raster with a stated assumption on GPUs without hardware RT", () => {

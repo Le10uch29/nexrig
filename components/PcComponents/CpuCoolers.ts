@@ -1,5 +1,23 @@
 import type { CoolerSpec, CpuSocket } from "@/types/hardware";
-import { price, slug } from "./shared";
+import { BLACK, price, slug, withColorVariants } from "./shared";
+
+/** White editions of real coolers: fins/shroud and fan frames in white. */
+const WHITE_COOLER = { colorway: "white" as const, color: "#eceef2", accent: "#f4f5f7" };
+const WHITE_EDITIONS = new Set([
+  "deepcool-ak400",
+  "deepcool-ak620",
+  "deepcool-ls720",
+  "thermalright-peerless-assassin-120-se",
+  "thermalright-phantom-spirit-120-se",
+  "arctic-freezer-36",
+  "arctic-liquid-freezer-iii-240",
+  "arctic-liquid-freezer-iii-280",
+  "arctic-liquid-freezer-iii-360",
+  "corsair-icue-h100i-elite-capellix-xt",
+  "corsair-icue-h150i-elite-capellix-xt",
+]);
+/** Sold primarily in white, also in black. */
+const BLACK_EDITIONS = new Set(["nzxt-kraken-240", "nzxt-kraken-360"]);
 
 /**
  * CPU coolers: tower air coolers, low-profile and AIO liquid coolers.
@@ -53,7 +71,7 @@ const ROWS: Row[] = [
   { brand: "NZXT", model: "Kraken 360", kind: "aio", sockets: [...MODERN, ...S115X], heightMm: 53, radiatorMm: 360, rub: 17000, color: "#e9eaee", accent: "#8b8fff", year: 2023 },
 ];
 
-export const CPU_COOLERS: CoolerSpec[] = ROWS.map((r): CoolerSpec => ({
+const BASE: CoolerSpec[] = ROWS.map((r): CoolerSpec => ({
   id: slug(`${r.brand}-${r.model}`),
   category: "cooler",
   brand: r.brand,
@@ -69,4 +87,12 @@ export const CPU_COOLERS: CoolerSpec[] = ROWS.map((r): CoolerSpec => ({
   radiatorMm: r.radiatorMm,
   maxRamHeightMm: r.maxRamHeightMm,
   ratedTdpW: r.ratedTdpW,
-})).sort((a, b) => a.kind.localeCompare(b.kind) || a.price.amountRub - b.price.amountRub);
+}));
+
+export const CPU_COOLERS: CoolerSpec[] = withColorVariants(BASE, (c) =>
+  WHITE_EDITIONS.has(c.id)
+    ? { base: "black", variants: [WHITE_COOLER] }
+    : BLACK_EDITIONS.has(c.id)
+      ? { base: "white", variants: [{ colorway: "black", ...BLACK }] }
+      : undefined,
+).sort((a, b) => a.kind.localeCompare(b.kind) || a.price.amountRub - b.price.amountRub);

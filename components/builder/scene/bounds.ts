@@ -1,5 +1,6 @@
 import { BOARD_LAYOUTS, DIMM_LENGTH, MM, PSU_DIMENSIONS, SLOT_PITCH, type Vec3 } from "@/features/installation/layout";
 import type { Placement } from "@/features/installation/placement";
+import { assetFor } from "@/features/models/registry";
 
 export interface LocalBounds {
   center: Vec3;
@@ -21,6 +22,8 @@ function union(boxes: LocalBounds[]): LocalBounds {
 /** Axis-aligned bounds of a placed component's model in its group's local frame. */
 export function boundsFor(p: Placement): LocalBounds {
   const c = p.component;
+  const asset = p.category === "ram" || p.category === "fans" || p.category === "cooler" ? undefined : assetFor(c);
+  if (asset?.modelUrl && asset.boundingBox) return asset.boundingBox;
   switch (c.category) {
     case "case":
       return { center: [0, 0, 0], size: [0, 0, 0] };

@@ -1,4 +1,4 @@
-﻿import { ALL_COMPONENTS } from "@/components/PcComponents";
+import { ALL_COMPONENTS } from "@/components/PcComponents";
 import type { BuildSelection } from "@/types/build";
 import type { ComponentCategory, ComponentOf, HardwareComponent } from "@/types/hardware";
 

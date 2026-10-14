@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
+import { CURRENCIES, toRub, useCurrency } from "@/features/settings/currency";
 import { GAMES } from "@/data/games";
 import { useBuildDerived } from "@/features/build-state/derived";
 import { useBuildStore } from "@/features/build-state/store";
@@ -21,12 +22,16 @@ export function UpgradeView() {
   const [sort, setSort] = useState<UpgradeSort>("value");
   const [budget, setBudget] = useState("");
   const [hideIncompatible, setHideIncompatible] = useState(true);
-  const budgetRub = Number(budget) > 0 ? Number(budget) : undefined;
+  const currency = useCurrency();
+  const symbol = CURRENCIES.find((c) => c.id === currency)?.symbol ?? "₽";
+  // The budget is typed in the display currency and converted to RUB (catalogue currency).
+  const budgetRub = Number(budget) > 0 ? Math.round(toRub(Number(budget), currency)) : undefined;
 
   const { current, options } = useUpgradeOptions(selection, perf.gameId, perf.settings);
   const list = sortUpgrades(options, sort, { kind, budget: budgetRub, hideIncompatible });
   const game = GAMES.find((g) => g.id === perf.gameId) ?? GAMES[0];
-  const agent = useMemo(() => upgradeAgent(selection, game, perf.settings, budgetRub), [selection, game, perf.settings, budgetRub]);
+  // Memoized by the React Compiler.
+  const agent = upgradeAgent(selection, game, perf.settings, budgetRub);
 
   return (
     <div className="mx-auto w-full max-w-[1280px] space-y-6 px-4 py-6 md:px-6">
@@ -40,7 +45,7 @@ export function UpgradeView() {
       <section className="space-y-4 rounded-[var(--radius-lg)] border border-line bg-panel p-4">
         <PerformanceControls layout="row" gameId={perf.gameId} settings={perf.settings} gpu={resolved.gpu} onGame={(gameId) => setPerf({ gameId })} onSettings={(settings) => setPerf({ settings })} />
         <div className="flex flex-wrap items-end gap-4 border-t border-line pt-4">
-          <Field label="Бюджет, ₽">
+          <Field label={`Бюджет, ${symbol}`}>
             <input inputMode="numeric" placeholder="без ограничения" className={`${inputCls} w-44`} value={budget} onChange={(e) => setBudget(e.target.value.replace(/\D/g, ""))} />
           </Field>
           <Field label="Компонент">
@@ -61,7 +66,7 @@ export function UpgradeView() {
               value={sort}
               onChange={setSort}
               options={[
-                { value: "value", label: "₽ за кадр" },
+                { value: "value", label: `${symbol} за кадр` },
                 { value: "gain", label: "Прирост" },
                 { value: "price", label: "Цена" },
               ]}

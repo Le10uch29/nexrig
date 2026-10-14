@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
-import { GamesView } from "@/components/benchmarks/GamesView";
+import { FpsLab } from "@/components/benchmarks/FpsLab";
 
-export const metadata: Metadata = { title: "Игры и FPS" };
+export const metadata: Metadata = { title: "FPS Lab" };
 
 export default function GamesPage() {
-  return <GamesView />;
+  return <FpsLab />;
 }

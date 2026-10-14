@@ -15,7 +15,7 @@ export const ru = {
   },
   nav: {
     builder: "Сборка ПК",
-    games: "Игры и FPS",
+    games: "FPS Lab",
     upgrade: "Апгрейд",
     expert: "AI-эксперт",
     database: "База железа",
@@ -52,8 +52,8 @@ export const ru = {
   status: {
     compatible: "Совместимо",
     incompatible: "Несовместимо",
-    verify: "Требует проверки",
-    insufficient: "Недостаточно данных",
+    warning: "Предупреждение",
+    unknown: "Недостаточно данных",
   } satisfies Record<CheckStatus, string>,
   sidebar: {
     currentBuild: "Текущая сборка",

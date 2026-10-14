@@ -5,7 +5,7 @@ import { GAMES } from "@/data/games";
 import { useMeasuredBenchmarks } from "@/features/benchmarks/measured-store";
 import { useBuildDerived } from "@/features/build-state/derived";
 import { useBuildStore } from "@/features/build-state/store";
-import { getPerformance } from "@/lib/benchmark-engine/estimate";
+import { getPerformance, memoryOf } from "@/lib/benchmark-engine/estimate";
 import { useMessages } from "@/lib/i18n";
 import { cx, SectionTitle } from "@/components/ui/primitives";
 import { FpsResult } from "./FpsResult";
@@ -18,7 +18,7 @@ export function PerformancePanel() {
   const setPerf = useBuildStore((s) => s.setPerf);
   const measured = useMeasuredBenchmarks((s) => s.records);
   const game = GAMES.find((g) => g.id === perf.gameId);
-  const result = getPerformance({ game, cpu: resolved.cpu, gpu: resolved.gpu, settings: perf.settings, measured });
+  const result = getPerformance({ game, cpu: resolved.cpu, gpu: resolved.gpu, settings: perf.settings, measured, memory: memoryOf(resolved.ram, resolved.ramCount) });
 
   return (
     <div className="space-y-4">
@@ -34,7 +34,7 @@ export function PerformancePanel() {
         <SectionTitle>Все игры · те же настройки</SectionTitle>
         <ul className="divide-y divide-line rounded-[var(--radius-md)] border border-line">
           {GAMES.map((g) => {
-            const r = getPerformance({ game: g, cpu: resolved.cpu, gpu: resolved.gpu, settings: perf.settings, measured });
+            const r = getPerformance({ game: g, cpu: resolved.cpu, gpu: resolved.gpu, settings: perf.settings, measured, memory: memoryOf(resolved.ram, resolved.ramCount) });
             return (
               <li key={g.id}>
                 <button

@@ -10,7 +10,23 @@
       "PowerShell(npx eslint . 2>&1)",
       "PowerShell(\\(Get-Item app\\\\globals.css\\).LastWriteTime = Get-Date; Start-Sleep -Seconds 3; \"touched\")",
       "PowerShell(npx next start --port 3200)",
-      "PowerShell(npx eslint components features lib 2>&1)"
+      "PowerShell(npx eslint components features lib 2>&1)",
+      "Bash(sed -i -e 's/counts\\\\.verify/counts.warning/g' components/builder/BuildSidebar.tsx)",
+      "Bash(sed -i -e 's/s === \"verify\"/s === \"warning\"/' components/builder/CatalogPanel.tsx)",
+      "Bash(sed -i -e 's/^  verify: /  warning: /; s/^  insufficient: /  unknown: /; s/\"verify\", \"insufficient\"/\"warning\", \"unknown\"/' components/compatibility/CompatibilityReport.tsx)",
+      "Bash(sed -i -e 's/^  verify: {/  warning: {/; s/^  insufficient: {/  unknown: {/; s/status === \"verify\"/status === \"warning\"/' components/ui/primitives.tsx)",
+      "Bash(sed -i -e 's/counts\\\\.verify/counts.warning/g; s/counts\\\\.insufficient/counts.unknown/g; s/=== \"verify\"/=== \"warning\"/g' lib/agents/specialists.ts)",
+      "PowerShell(npx vitest run 2>&1)",
+      "Bash(sed -i -e 's/\"verify\"/\"warning\"/g; s/\"insufficient\"/\"unknown\"/g' tests/compatibility.test.ts)",
+      "Bash(npx vitest *)",
+      "PowerShell(node \"C:\\\\Users\\\\SHADOW~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\bundled-skills\\\\2.1.296\\\\e5c74a4e8d2d94cd14feadd36a0f7558\\\\dataviz\\\\scripts\\\\validate_palette.js\" \"#8d7dff,#4fd1e3\" --mode dark --surface \"#0f131d\" 2>&1)",
+      "PowerShell(node \"C:\\\\Users\\\\SHADOW~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\bundled-skills\\\\2.1.296\\\\e5c74a4e8d2d94cd14feadd36a0f7558\\\\dataviz\\\\scripts\\\\validate_palette.js\" \"#8d7dff,#22a6bd\" --mode dark --surface \"#0f131d\" 2>&1)",
+      "Bash(sed -i -e 's/settings, measured }\\);/settings, measured, memory: memoryOf\\(build.ram, build.ramCount\\) }\\);/; s/settings, measured }\\),/settings, measured, memory: memoryOf\\(build.ram, build.ramCount\\) }\\),/; s/settings, measured: \\\\[\\\\] }\\);/settings, measured: [], memory: memoryOf\\(build.ram, build.ramCount\\) }\\);/g' lib/agents/specialists.ts)",
+      "Bash(sed -i -e 's/import { getPerformance } from \"@\\\\/lib\\\\/benchmark-engine\\\\/estimate\";/import { getPerformance, memoryOf } from \"@\\\\/lib\\\\/benchmark-engine\\\\/estimate\";/' lib/agents/specialists.ts components/benchmarks/PerformancePanel.tsx components/builder/ComparePanel.tsx)",
+      "Bash(sed -i -e 's/settings: perf.settings, measured }\\);/settings: perf.settings, measured, memory: memoryOf\\(resolved.ram, resolved.ramCount\\) }\\);/g' components/benchmarks/PerformancePanel.tsx)",
+      "Bash(sed -i -e 's/settings: perf.settings, measured: \\\\[\\\\] }\\) };/settings: perf.settings, measured: [], memory: memoryOf\\(r.ram, r.ramCount\\) }\\) };/' components/builder/ComparePanel.tsx)",
+      "PowerShell(Remove-Item components\\\\benchmarks\\\\GamesView.tsx; \\(Get-Content lib\\\\i18n\\\\ru.ts -Encoding UTF8\\) -replace 'games: \"Игры и FPS\",', 'games: \"FPS Lab\",' | Set-Content lib\\\\i18n\\\\ru.ts -Encoding UTF8; node -e \"const fs=require\\('fs'\\);const p='lib/i18n/ru.ts';const b=fs.readFileSync\\(p\\);if\\(b[0]===0xEF\\)fs.writeFileSync\\(p,b.subarray\\(3\\)\\)\"; Select-String -Path lib\\\\i18n\\\\ru.ts -Pattern 'games:' ; npx tsc --noEmit 2>&1 | Select-Object -First 30)",
+      "Bash(npx eslint *)"
     ]
   }
 }

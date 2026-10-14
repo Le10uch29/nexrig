@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { usePrice } from "@/features/settings/currency";
 import { useBuildDerived } from "@/features/build-state/derived";
 import { useBuildStore } from "@/features/build-state/store";
 import { keySpecs } from "@/lib/hardware/specs";
-import { formatPrice, useMessages } from "@/lib/i18n";
+import { useMessages } from "@/lib/i18n";
+import { ColorSwatches } from "@/components/hardware/ColorSwatches";
 import { ComponentThumb } from "@/components/hardware/ComponentThumb";
+import { colorVariantsOf } from "@/lib/hardware/variants";
 import { PerformancePanel } from "@/components/benchmarks/PerformancePanel";
 import { CompatibilityReportView } from "@/components/compatibility/CompatibilityReport";
 import { UpgradeList } from "@/components/ai/UpgradeList";
@@ -17,6 +20,7 @@ import { ComparePanel } from "./ComparePanel";
 import { SavedBuildsPanel } from "./SavedBuildsPanel";
 
 function BuildDetails() {
+  const formatPrice = usePrice();
   const t = useMessages();
   const { placements, resolved } = useBuildDerived();
   const qty = (category: string) => (category === "ram" ? resolved.ramCount : 1);
@@ -24,6 +28,7 @@ function BuildDetails() {
   const selected = useBuildStore((s) => s.selectedSlot);
   const openCatalog = useBuildStore((s) => s.openCatalog);
   const removeComponent = useBuildStore((s) => s.removeComponent);
+  const setComponent = useBuildStore((s) => s.setComponent);
   if (placements.length === 0) return <EmptyState title="Сборка пуста">Выберите корпус в разделе «Конфигурация».</EmptyState>;
   return (
     <ul className="space-y-2">
@@ -56,6 +61,11 @@ function BuildDetails() {
                   </div>
                 ))}
               </dl>
+              {p.category !== "storage" && colorVariantsOf(p.component).length > 1 && (
+                <div className="mt-3">
+                  <ColorSwatches variants={colorVariantsOf(p.component)} current={p.component.id} onPick={(v) => setComponent(v, { instant: true })} />
+                </div>
+              )}
               <div className="mt-3 flex gap-1.5">
                 <Button size="sm" onClick={() => openCatalog(p.category, p.component.id)}>
                   {t.timeline.replace}

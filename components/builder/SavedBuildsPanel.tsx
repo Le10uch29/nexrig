@@ -1,9 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { usePrice } from "@/features/settings/currency";
 import { useSavedBuilds } from "@/features/build-state/saved-builds";
 import { useBuildStore } from "@/features/build-state/store";
-import { formatPrice, useMessages } from "@/lib/i18n";
+import { useMessages } from "@/lib/i18n";
 import type { SavedBuild } from "@/types/build";
 import { IconBookmark, IconDownload, IconTrash, IconUpload } from "@/components/ui/icons";
 import { Button, EmptyState, inputCls } from "@/components/ui/primitives";
@@ -19,6 +20,7 @@ function download(build: SavedBuild) {
 }
 
 export function SavedBuildsPanel() {
+  const formatPrice = usePrice();
   const t = useMessages();
   const builds = useSavedBuilds((s) => s.builds);
   const save = useSavedBuilds((s) => s.save);

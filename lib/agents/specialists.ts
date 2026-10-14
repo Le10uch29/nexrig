@@ -1,6 +1,6 @@
 import { GAMES } from "@/data/games";
 import { checkBuild, evaluateCandidate } from "@/features/compatibility/engine";
-import { getPerformance } from "@/lib/benchmark-engine/estimate";
+import { getPerformance, memoryOf } from "@/lib/benchmark-engine/estimate";
 import { estimatePeakPower, recommendedPsuWattage } from "@/lib/hardware/power";
 import { hardwareRepository, resolveBuild, totalPrice, type ResolvedBuild } from "@/lib/hardware/repository";
 import { formatPrice, getMessages } from "@/lib/i18n";
@@ -30,9 +30,9 @@ export function compatibilityAgent(selection: BuildSelection): AgentResult {
     summary:
       problems.length === 0
         ? `Все ${report.checks.length} проверок пройдены.`
-        : `Итог: ${t[report.overall].toLowerCase()}. Несовместимо: ${report.counts.incompatible}, требует проверки: ${report.counts.verify}, недостаточно данных: ${report.counts.insufficient}.`,
+        : `Итог: ${t[report.overall].toLowerCase()}. Несовместимо: ${report.counts.incompatible}, требует проверки: ${report.counts.warning}, недостаточно данных: ${report.counts.unknown}.`,
     findings: problems.map((c) => ({
-      severity: c.status === "incompatible" ? "critical" : c.status === "verify" ? "warning" : "info",
+      severity: c.status === "incompatible" ? "critical" : c.status === "warning" ? "warning" : "info",
       text: `${c.title}: ${c.detail}${c.resolution ? ` Решение: ${c.resolution}` : ""}`,
     })),
     toolCalls: [
@@ -52,10 +52,10 @@ export function benchmarkAgent(
   settings: GameSettings,
   measured: BenchmarkRecord[],
 ): AgentResult {
-  const main = getPerformance({ game, cpu: build.cpu, gpu: build.gpu, settings, measured });
+  const main = getPerformance({ game, cpu: build.cpu, gpu: build.gpu, settings, measured, memory: memoryOf(build.ram, build.ramCount) });
   const others = GAMES.filter((g) => g.id !== game.id).map((g) => ({
     g,
-    r: getPerformance({ game: g, cpu: build.cpu, gpu: build.gpu, settings, measured }),
+    r: getPerformance({ game: g, cpu: build.cpu, gpu: build.gpu, settings, measured, memory: memoryOf(build.ram, build.ramCount) }),
   }));
   const usedMeasured = main.kind === "measured" || others.some((o) => o.r.kind === "measured");
   const settingsLabel = `${settings.resolution}, ${getMessages().perf.presets[settings.preset]}${settings.rayTracing ? ", RT" : ""}${settings.upscaling !== "off" ? `, апскейлинг ${settings.upscaling}` : ""}`;
@@ -104,7 +104,7 @@ export interface UpgradeOption {
 
 export function upgradeOptions(selection: BuildSelection, game: Game, settings: GameSettings): { current: number | null; options: UpgradeOption[] } {
   const build = resolveBuild(selection);
-  const cur = getPerformance({ game, cpu: build.cpu, gpu: build.gpu, settings, measured: [] });
+  const cur = getPerformance({ game, cpu: build.cpu, gpu: build.gpu, settings, measured: [], memory: memoryOf(build.ram, build.ramCount) });
   const current = cur.kind === "unavailable" ? null : cur.avgFps;
   const options: UpgradeOption[] = [];
 
@@ -122,7 +122,7 @@ export function upgradeOptions(selection: BuildSelection, game: Game, settings: 
   }
 
   for (const { gpu, verdict } of byChip.values()) {
-    const perf = getPerformance({ game, cpu: build.cpu, gpu, settings, measured: [] });
+    const perf = getPerformance({ game, cpu: build.cpu, gpu, settings, measured: [], memory: memoryOf(build.ram, build.ramCount) });
     const fps = perf.kind === "unavailable" ? null : perf.avgFps;
     const notes: string[] = [];
     const psuNeed = recommendedPsuWattage({ ...build, gpu });
@@ -144,7 +144,7 @@ export function upgradeOptions(selection: BuildSelection, game: Game, settings: 
     for (const cpu of hardwareRepository.byCategory("cpu")) {
       if (cpu.id === build.cpu?.id) continue;
       const verdict = evaluateCandidate(selection, cpu);
-      const perf = getPerformance({ game, cpu, gpu: build.gpu, settings, measured: [] });
+      const perf = getPerformance({ game, cpu, gpu: build.gpu, settings, measured: [], memory: memoryOf(build.ram, build.ramCount) });
       const fps = perf.kind === "unavailable" ? null : perf.avgFps;
       const notes: string[] = [];
       if (build.motherboard && cpu.socket !== build.motherboard.socket) notes.push(`Нужна новая плата (${cpu.socket})`);
@@ -180,8 +180,8 @@ export function upgradeAgent(selection: BuildSelection, game: Game, settings: Ga
           ? `Лучшее соотношение прироста к цене: ${top[0].component.name} (+${top[0].gainPct}% по оценке).`
           : "Апгрейдов с оценочным приростом ≥5% в заданном бюджете не найдено.",
     findings: top.map((o) => ({
-      severity: o.compatibility === "verify" ? "warning" : "positive",
-      text: `${o.kind.toUpperCase()} ${o.component.name}: ~${o.fps} FPS (+${o.gainPct}%), ${formatPrice(o.priceRub)}, ~${formatPrice(o.rubPerFps ?? 0)} за +1 FPS${o.notes.length ? ` — ${o.notes.join("; ")}` : ""}${o.compatibility === "verify" ? " — требует проверки совместимости" : ""}.`,
+      severity: o.compatibility === "warning" ? "warning" : "positive",
+      text: `${o.kind.toUpperCase()} ${o.component.name}: ~${o.fps} FPS (+${o.gainPct}%), ${formatPrice(o.priceRub)}, ~${formatPrice(o.rubPerFps ?? 0)} за +1 FPS${o.notes.length ? ` — ${o.notes.join("; ")}` : ""}${o.compatibility === "warning" ? " — требует проверки совместимости" : ""}.`,
     })),
     toolCalls: [
       {

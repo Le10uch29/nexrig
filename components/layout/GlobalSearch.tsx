@@ -1,16 +1,18 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { usePrice } from "@/features/settings/currency";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useBuildStore } from "@/features/build-state/store";
 import { hardwareRepository } from "@/lib/hardware/repository";
-import { formatPrice, useMessages } from "@/lib/i18n";
+import { useMessages } from "@/lib/i18n";
 import { ComponentThumb } from "@/components/hardware/ComponentThumb";
 import { IconSearch } from "@/components/ui/icons";
 import { cx } from "@/components/ui/primitives";
 
 /** Combobox over the hardware repository. Ctrl/⌘+K focuses it from anywhere. */
 export function GlobalSearch() {
+  const formatPrice = usePrice();
   const t = useMessages();
   const router = useRouter();
   const openCatalog = useBuildStore((s) => s.openCatalog);

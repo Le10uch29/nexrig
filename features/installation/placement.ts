@@ -2,6 +2,7 @@ import type { ResolvedBuild } from "@/lib/hardware/repository";
 import type { CompatibilityCheck } from "@/types/compatibility";
 import type { ComponentCategory, HardwareComponent } from "@/types/hardware";
 import { ramSlotsFor, resolveAnchors, type AnchorMap, type Pose } from "./anchors";
+import { computeFit, relativeTo } from "./fit";
 import { caseGeometry, type Vec3 } from "./layout";
 
 export type SlotKey = Exclude<ComponentCategory, "storage"> | `storage:${string}`;
@@ -23,19 +24,21 @@ export interface Placement {
   bench: Pose;
   /** Child offsets (world-aligned) for multi-part groups: RAM modules, fan packs. */
   children?: { offset: Vec3; rotation: Vec3 }[];
-  /** Offset from the cooler mount to the radiator (AIO). */
-  radiatorOffset?: Vec3;
+  /** Insertion direction override (parts going into the rear chamber come from behind). */
+  approach?: Vec3;
+  /** AIO radiator centre relative to the cooler mount, and its rotation (case frame). */
+  radiator?: Pose;
 }
 
 /** Checks that make physical mounting impossible. Electrical issues don't block mounting. */
 const BLOCKING_RULES: Partial<Record<ComponentCategory, string[]>> = {
   motherboard: ["form-factor"],
   cpu: ["socket"],
-  cooler: ["cooler-socket", "cooler-height", "radiator"],
+  cooler: ["cooler-socket", "cooler-height", "radiator", "radiator-fit"],
   ram: ["memory-type", "memory-slots"],
   gpu: ["gpu-length"],
   psu: ["psu-form"],
-  fans: ["fans"],
+  fans: ["fans", "fans-fit"],
 };
 
 export const INSTALL_ORDER: ComponentCategory[] = [
@@ -98,8 +101,10 @@ const WAITING = {
 
 export function computePlacements(b: ResolvedBuild, checks: CompatibilityCheck[]): Placement[] {
   const caseDepth = b.case ? caseGeometry(b.case).depth : null;
-  const aio = b.cooler?.kind === "aio";
-  const anchors: AnchorMap = b.case ? resolveAnchors(b.case, b.motherboard, { frontOccupiedByRadiator: aio }) : {};
+  const anchors: AnchorMap = b.case ? resolveAnchors(b.case, b.motherboard) : {};
+  const fit = computeFit(b);
+  // Dual-chamber cases: PSU and SATA drives live behind the tray and go in from behind.
+  const rearChamber = b.case?.layout === "dual-chamber";
   const out: Placement[] = [];
 
   const push = (
@@ -137,11 +142,8 @@ export function computePlacements(b: ResolvedBuild, checks: CompatibilityCheck[]
 
   if (b.cooler) {
     const extra: Partial<Placement> = {};
-    if (b.cooler.kind === "aio" && anchors.radiator_mount && anchors.cpu_cooler_mount) {
-      const r = anchors.radiator_mount.position;
-      const m = anchors.cpu_cooler_mount.position;
-      extra.radiatorOffset = [r[0] - m[0], r[1] - m[1], r[2] - m[2]];
-    }
+    const rad = fit?.radiator?.chosen;
+    if (b.cooler.kind === "aio" && rad && anchors.cpu_cooler_mount) extra.radiator = relativeTo(rad.pose, anchors.cpu_cooler_mount.position);
     push("cooler", b.cooler, anchors.cpu_cooler_mount, cpu?.state === "mounted" ? null : WAITING.cpu, extra);
   }
 
@@ -170,7 +172,7 @@ export function computePlacements(b: ResolvedBuild, checks: CompatibilityCheck[]
     if (drive.formFactor === "3.5in") {
       hddIndex++;
       const anchor = anchors[`hdd_bay_${hddIndex}`];
-      const p = push(`storage:${drive.id}`, drive, anchor, b.case ? null : WAITING.case, {}, i);
+      const p = push(`storage:${drive.id}`, drive, anchor, b.case ? null : WAITING.case, rearChamber ? { approach: [0, 0, -1.2] } : {}, i);
       if (b.case && !anchor) {
         p.reason = "conflict";
         p.reasonText = "Нет свободного отсека 3.5″";
@@ -186,7 +188,7 @@ export function computePlacements(b: ResolvedBuild, checks: CompatibilityCheck[]
     } else {
       sataIndex++;
       const anchor = anchors[`drive_bay_${sataIndex}`];
-      const p = push(`storage:${drive.id}`, drive, anchor, b.case ? null : WAITING.case, {}, i);
+      const p = push(`storage:${drive.id}`, drive, anchor, b.case ? null : WAITING.case, rearChamber ? { approach: [0, 0, -1.2] } : {}, i);
       if (b.case && !anchor) {
         p.reason = "conflict";
         p.reasonText = "Нет свободного отсека 2.5″";
@@ -194,10 +196,10 @@ export function computePlacements(b: ResolvedBuild, checks: CompatibilityCheck[]
     }
   });
 
-  if (b.psu) push("psu", b.psu, anchors.psu_bay, b.case ? null : WAITING.case);
+  if (b.psu) push("psu", b.psu, anchors.psu_bay, b.case ? null : WAITING.case, rearChamber ? { approach: [0, 0, -1.4] } : {});
 
   if (b.fans) {
-    const fanAnchors = Array.from({ length: b.fans.count }, (_, i) => anchors[`fan_${i + 1}`]).filter((a): a is Pose => Boolean(a));
+    const fanAnchors = fit?.fans?.poses ?? [];
     const first = fanAnchors[0];
     const mountedChildren = first
       ? fanAnchors.map((a) => ({

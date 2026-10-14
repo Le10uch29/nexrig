@@ -1,5 +1,5 @@
 import type { CaseSpec, MotherboardSpec } from "@/types/hardware";
-import { BOARD_LAYOUTS, caseGeometry, type Vec3 } from "./layout";
+import { BOARD_LAYOUTS, caseGeometry, PSU_DIMENSIONS, type Vec3 } from "./layout";
 
 /**
  * Named installation anchors. Board anchors exist only when a motherboard is mounted;
@@ -17,8 +17,7 @@ export type AnchorName =
   | `drive_bay_${number}`
   | `hdd_bay_${number}`
   | "psu_bay"
-  | `fan_${number}`
-  | "radiator_mount";
+  | `fan_${number}`;
 
 export interface Pose {
   position: Vec3;
@@ -30,35 +29,40 @@ export type AnchorMap = Partial<Record<AnchorName, Pose>>;
 const add = (a: Vec3, b: Vec3): Vec3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 const pose = (position: Vec3, rotation: Vec3 = [0, 0, 0]): Pose => ({ position, rotation });
 
-export interface AnchorOptions {
-  /** Fans go to the top panel when the front is used by an AIO radiator. */
-  frontOccupiedByRadiator?: boolean;
-}
-
-export function resolveAnchors(pcCase: CaseSpec, board?: MotherboardSpec, opts: AnchorOptions = {}): AnchorMap {
+/**
+ * Static case/board anchors. Radiator and case-fan positions depend on the other parts
+ * (GPU length, RAM height, radiator size) and come from fit.ts.
+ */
+export function resolveAnchors(pcCase: CaseSpec, board?: MotherboardSpec): AnchorMap {
   const g = caseGeometry(pcCase);
+  const layout = BOARD_LAYOUTS[board?.formFactor ?? pcCase.supportedBoards[0] ?? "ATX"];
+  const rearChamber = -g.width / 2 + g.wall + 0.02;
+  // Shroud cases: PSU at the rear under the shroud. Dual-chamber: PSU on its side behind the tray
+  // (rotated so its height runs toward the tray). Compact cases: SFX PSU in front of the board, above the GPU.
+  const psuBay: Pose = g.dualChamber
+    ? pose([-g.depth / 2 + g.wall + 0.04, g.wall + 0.02 + PSU_DIMENSIONS.ATX.width / 2, rearChamber], [Math.PI / 2, 0, 0])
+    : g.shroudHeight > 0
+      ? pose([-g.depth / 2 + g.wall + 0.04, 0.1, -g.width / 2 + g.wall + 0.85])
+      : pose([g.boardOrigin[0] + layout.width + 0.04, Math.min(g.boardOrigin[1] + layout.pcie[1] + 0.15, g.height - g.wall - PSU_DIMENSIONS.SFX.height - 0.02), 0]);
   const anchors: AnchorMap = {
     case_mount: pose([0, 0, 0]),
     motherboard_mount: pose(g.boardOrigin),
-    psu_bay: pose([-g.depth / 2 + g.wall + 0.04, 0.1, -g.width / 2 + g.wall + 0.85]),
-    radiator_mount: pose([g.depth / 2 - 0.42, (g.height + g.shroudHeight) / 2 + 0.05, 0]),
+    psu_bay: psuBay,
   };
 
   for (let i = 0; i < pcCase.drive25Bays; i++) {
-    anchors[`drive_bay_${i + 1}`] = pose([g.depth / 2 - 1.55, g.shroudHeight + 0.005 + i * 0.09, 0.15]);
+    anchors[`drive_bay_${i + 1}`] = g.dualChamber
+      ? // Rear chamber, lying flat above the PSU area toward the front.
+        pose([g.depth / 2 - 1.25, 1.75 + i * 0.09, rearChamber + 0.03])
+      : // 2.5″ bays end before the front radiator / fan stack.
+        pose([g.depth / 2 - 1.75, g.shroudHeight + 0.005 + i * 0.09, 0.15]);
   }
-  // 3.5″ drives sit on the shroud toward the rear, stacked like a drive cage.
   for (let i = 0; i < pcCase.drive35Bays; i++) {
-    anchors[`hdd_bay_${i + 1}`] = pose([-g.depth / 2 + 0.55, g.shroudHeight + 0.005 + i * 0.3, -0.45]);
-  }
-
-  // Fans: front intake column, or along the top when the front holds a radiator.
-  for (let i = 0; i < pcCase.fanSlots120; i++) {
-    if (opts.frontOccupiedByRadiator) {
-      anchors[`fan_${i + 1}`] = pose([-g.depth / 2 + 1.05 + i * 1.25, g.height - g.wall - 0.16, 0], [Math.PI / 2, 0, 0]);
-    } else {
-      anchors[`fan_${i + 1}`] = pose([g.depth / 2 - g.wall - 0.16, g.height - 0.95 - i * 1.25, 0], [0, Math.PI / 2, 0]);
-    }
+    anchors[`hdd_bay_${i + 1}`] = g.dualChamber
+      ? // Rear chamber, standing on edge (rotated so the 102 mm width runs downward).
+        pose([g.depth / 2 - 1.65, g.height - 0.35, rearChamber + 0.03 + i * 0.3], [Math.PI / 2, 0, 0])
+      : // 3.5″ drives sit on the shroud toward the rear, stacked like a drive cage.
+        pose([-g.depth / 2 + 0.55, g.shroudHeight + 0.005 + i * 0.3, -0.45]);
   }
 
   if (board) {

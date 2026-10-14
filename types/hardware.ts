@@ -73,7 +73,16 @@ interface BaseComponent<C extends ComponentCategory> {
   releaseYear?: number;
   /** Shown in the UI when the entry is generated from a template (e.g. partner GPU lines). */
   variantNote?: string;
+  /** Finish of this SKU, when the product is sold in several colours. */
+  colorway?: Colorway;
+  /** Shared by colour variants of one product (black/white SKUs); the id of the primary variant. */
+  variantGroup?: string;
 }
+
+export type Colorway = "black" | "white";
+
+/** Case fan mounting positions. */
+export type FanPosition = "front" | "top" | "rear" | "bottom" | "side";
 
 export interface CaseSpec extends BaseComponent<"case"> {
   supportedBoards: BoardFormFactor[];
@@ -87,7 +96,20 @@ export interface CaseSpec extends BaseComponent<"case"> {
   fanSlots120: number;
   drive25Bays: number;
   drive35Bays: number;
+  /** Rear expansion slots (limits GPU thickness). */
+  expansionSlots: number;
+  /** Where radiators can go and which sizes each position takes. */
+  radiatorMounts: RadiatorMount[];
   style: "mesh" | "glass-showcase" | "compact";
+  /** "dual-chamber": PSU and drives behind the motherboard tray (aquarium cases), no PSU shroud. */
+  layout: "classic" | "dual-chamber";
+  /** Fan slots per position (120 mm), summing to fanSlots120. */
+  fanMounts: Partial<Record<FanPosition, number>>;
+}
+
+export interface RadiatorMount {
+  position: "front" | "top" | "side" | "bottom";
+  sizesMm: number[];
 }
 
 export interface MotherboardSpec extends BaseComponent<"motherboard"> {
@@ -109,6 +131,8 @@ export interface MotherboardSpec extends BaseComponent<"motherboard"> {
   biosUpdateFamilies: string[];
   /** CPU families that fit the socket but the chipset does not support at all. */
   unsupportedFamilies: string[];
+  /** Whether the chipset allows memory above the CPU's official (JEDEC) speed — XMP/EXPO. */
+  memoryOverclock: boolean;
 }
 
 export interface CpuSpec extends BaseComponent<"cpu"> {
@@ -126,6 +150,8 @@ export interface CpuSpec extends BaseComponent<"cpu"> {
   /** Peak sustained package power used for PSU sizing. */
   peakPowerW: number;
   memorySupport: MemoryType[];
+  /** Official (JEDEC) memory speed per supported type, MT/s. Faster kits run as an overclock. */
+  memorySpeedMtps: Partial<Record<MemoryType, number>>;
   pcieGen: PcieGen;
   integratedGraphics: boolean;
   /**
@@ -187,6 +213,10 @@ export interface GpuSpec extends BaseComponent<"gpu"> {
   /** Relative ray-tracing index (RTX 4070 = 100); 0 without hardware RT. Model parameter. */
   rtIndex: number;
   upscalers: ("DLSS" | "FSR" | "XeSS")[];
+  /** Cooler fans visible on the card (1 = blower-style). */
+  fans?: number;
+  /** Lighting only where the product line actually has it. */
+  rgb?: boolean;
 }
 
 export interface StorageSpec extends BaseComponent<"storage"> {
@@ -217,6 +247,8 @@ export interface FanSpec extends BaseComponent<"fans"> {
   count: number;
   rgb: boolean;
   maxRpm: number;
+  /** Reverse-blade version: the clean side faces out when mounted as bottom/side intake. */
+  reverse?: boolean;
 }
 
 export type HardwareComponent =

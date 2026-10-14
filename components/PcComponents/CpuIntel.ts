@@ -10,23 +10,25 @@ interface Gen {
   family: string;
   socket: CpuSocket;
   memory: MemoryType[];
+  /** Official (JEDEC) memory speed per type, MT/s — the speed Intel specifies without XMP. */
+  memSpeed: Partial<Record<MemoryType, number>>;
   pcie: PcieGen;
 }
 
 const GEN: Record<string, Gen> = {
-  g2: { family: "2-е поколение (Sandy Bridge)", socket: "LGA1155", memory: ["DDR3"], pcie: 2 },
-  g3: { family: "3-е поколение (Ivy Bridge)", socket: "LGA1155", memory: ["DDR3"], pcie: 3 },
-  g4: { family: "4-е поколение (Haswell)", socket: "LGA1150", memory: ["DDR3"], pcie: 3 },
-  g6: { family: "6-е поколение (Skylake)", socket: "LGA1151", memory: ["DDR4"], pcie: 3 },
-  g7: { family: "7-е поколение (Kaby Lake)", socket: "LGA1151", memory: ["DDR4"], pcie: 3 },
-  g8: { family: "8-е поколение (Coffee Lake)", socket: "LGA1151-v2", memory: ["DDR4"], pcie: 3 },
-  g9: { family: "9-е поколение (Coffee Lake Refresh)", socket: "LGA1151-v2", memory: ["DDR4"], pcie: 3 },
-  g10: { family: "10-е поколение (Comet Lake)", socket: "LGA1200", memory: ["DDR4"], pcie: 3 },
-  g11: { family: "11-е поколение (Rocket Lake)", socket: "LGA1200", memory: ["DDR4"], pcie: 4 },
-  g12: { family: "12-е поколение (Alder Lake)", socket: "LGA1700", memory: ["DDR4", "DDR5"], pcie: 5 },
-  g13: { family: "13-е поколение (Raptor Lake)", socket: "LGA1700", memory: ["DDR4", "DDR5"], pcie: 5 },
-  g14: { family: "14-е поколение (Raptor Lake Refresh)", socket: "LGA1700", memory: ["DDR4", "DDR5"], pcie: 5 },
-  u2: { family: "Core Ultra 200S (Arrow Lake)", socket: "LGA1851", memory: ["DDR5"], pcie: 5 },
+  g2: { family: "2-е поколение (Sandy Bridge)", socket: "LGA1155", memory: ["DDR3"], memSpeed: { DDR3: 1333 }, pcie: 2 },
+  g3: { family: "3-е поколение (Ivy Bridge)", socket: "LGA1155", memory: ["DDR3"], memSpeed: { DDR3: 1600 }, pcie: 3 },
+  g4: { family: "4-е поколение (Haswell)", socket: "LGA1150", memory: ["DDR3"], memSpeed: { DDR3: 1600 }, pcie: 3 },
+  g6: { family: "6-е поколение (Skylake)", socket: "LGA1151", memory: ["DDR4"], memSpeed: { DDR4: 2133 }, pcie: 3 },
+  g7: { family: "7-е поколение (Kaby Lake)", socket: "LGA1151", memory: ["DDR4"], memSpeed: { DDR4: 2400 }, pcie: 3 },
+  g8: { family: "8-е поколение (Coffee Lake)", socket: "LGA1151-v2", memory: ["DDR4"], memSpeed: { DDR4: 2666 }, pcie: 3 },
+  g9: { family: "9-е поколение (Coffee Lake Refresh)", socket: "LGA1151-v2", memory: ["DDR4"], memSpeed: { DDR4: 2666 }, pcie: 3 },
+  g10: { family: "10-е поколение (Comet Lake)", socket: "LGA1200", memory: ["DDR4"], memSpeed: { DDR4: 2933 }, pcie: 3 },
+  g11: { family: "11-е поколение (Rocket Lake)", socket: "LGA1200", memory: ["DDR4"], memSpeed: { DDR4: 3200 }, pcie: 4 },
+  g12: { family: "12-е поколение (Alder Lake)", socket: "LGA1700", memory: ["DDR4", "DDR5"], memSpeed: { DDR4: 3200, DDR5: 4800 }, pcie: 5 },
+  g13: { family: "13-е поколение (Raptor Lake)", socket: "LGA1700", memory: ["DDR4", "DDR5"], memSpeed: { DDR4: 3200, DDR5: 5600 }, pcie: 5 },
+  g14: { family: "14-е поколение (Raptor Lake Refresh)", socket: "LGA1700", memory: ["DDR4", "DDR5"], memSpeed: { DDR4: 3200, DDR5: 5600 }, pcie: 5 },
+  u2: { family: "Core Ultra 200S (Arrow Lake)", socket: "LGA1851", memory: ["DDR5"], memSpeed: { DDR5: 6400 }, pcie: 5 },
 };
 
 // [model, gen, cores, threads, base GHz, boost GHz, TDP, peak W, year, gamingIndex, demo price RUB]
@@ -116,6 +118,7 @@ export const CPU_INTEL: CpuSpec[] = ROWS.map(([model, g, cores, threads, base, b
     tdpW: tdp,
     peakPowerW: peak,
     memorySupport: gen.memory,
+    memorySpeedMtps: gen.memSpeed,
     pcieGen: gen.pcie,
     integratedGraphics,
     gamingIndex: idx,

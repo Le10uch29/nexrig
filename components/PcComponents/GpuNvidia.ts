@@ -1,5 +1,6 @@
 import type { GpuSpec } from "@/types/hardware";
 import { buildGpuCatalogue, type GpuChip, type GpuLine, type ReferenceCard } from "./gpu-shared";
+import { withColorVariants } from "./shared";
 
 /**
  * NVIDIA GeForce, GTX 1060 → RTX 5090.
@@ -65,28 +66,28 @@ const before = (year: number) => (c: GpuChip) => c.year < year;
 const minTbp = (w: number) => (c: GpuChip) => c.tbpW >= w;
 
 const LINES: GpuLine[] = [
-  { brand: "ASUS", line: "ROG Strix", tier: "premium", color: "#1f2126", accent: "#c4304a", covers: all },
-  { brand: "ASUS", line: "TUF Gaming", tier: "mid", color: "#2a2b2f", accent: "#9aa0aa", covers: since(2019) },
+  { brand: "ASUS", line: "ROG Strix", tier: "premium", rgb: true, color: "#1f2126", accent: "#c4304a", covers: all },
+  { brand: "ASUS", line: "TUF Gaming", tier: "mid", rgb: true, color: "#2a2b2f", accent: "#9aa0aa", covers: since(2019) },
   { brand: "ASUS", line: "Dual", tier: "entry", color: "#25272c", accent: "#c9ccd2", covers: (c) => c.tbpW <= 250 },
-  { brand: "MSI", line: "Gaming X", tier: "mid", color: "#1c1d21", accent: "#d23a3a", covers: all, lineName: (c) => (c.tbpW >= 220 && c.year >= 2019 ? "Gaming X Trio" : "Gaming X") },
+  { brand: "MSI", line: "Gaming X", tier: "mid", rgb: true, color: "#1c1d21", accent: "#d23a3a", covers: all, lineName: (c) => (c.tbpW >= 220 && c.year >= 2019 ? "Gaming X Trio" : "Gaming X") },
   { brand: "MSI", line: "Ventus", tier: "entry", color: "#2b2d31", accent: "#8a8f99", covers: since(2018), lineName: (c) => (c.tbpW >= 220 ? "Ventus 3X" : "Ventus 2X") },
   { brand: "MSI", line: "Armor", tier: "entry", color: "#202226", accent: "#e0e0e0", covers: before(2018) },
-  { brand: "Gigabyte", line: "AORUS", tier: "premium", color: "#18191d", accent: "#f08a24", covers: minTbp(120) },
-  { brand: "Gigabyte", line: "Gaming OC", tier: "mid", color: "#202226", accent: "#f5a623", covers: all },
+  { brand: "Gigabyte", line: "AORUS", tier: "premium", rgb: true, color: "#18191d", accent: "#f08a24", covers: minTbp(120) },
+  { brand: "Gigabyte", line: "Gaming OC", tier: "mid", rgb: true, color: "#202226", accent: "#f5a623", covers: all },
   { brand: "Gigabyte", line: "Eagle", tier: "entry", color: "#2c2e33", accent: "#5fb0ff", covers: since(2020), lineName: (c) => (c.year >= 2025 ? "Windforce" : "Eagle") },
-  { brand: "Palit", line: "GamingPro", tier: "mid", color: "#1d1e22", accent: "#7a7f8a", covers: since(2018) },
+  { brand: "Palit", line: "GamingPro", tier: "mid", rgb: true, color: "#1d1e22", accent: "#7a7f8a", covers: since(2018) },
   { brand: "Zotac", line: "Twin Edge", tier: "entry", color: "#26282c", accent: "#f2c230", covers: (c) => c.year >= 2020 && c.tbpW <= 300 },
-  { brand: "Zotac", line: "AMP", tier: "premium", color: "#1b1c20", accent: "#f2c230", covers: minTbp(150) },
+  { brand: "Zotac", line: "AMP", tier: "premium", rgb: true, color: "#1b1c20", accent: "#f2c230", covers: minTbp(150) },
 ];
 
 const FE = { color: "#2b2d31", accent: "#9ea3ac" };
 /** Founders Edition cards with published dimensions. */
 const REFS: ReferenceCard[] = [
-  { chip: "GTX 1060 6 ГБ", lengthMm: 250, slots: 2 },
-  { chip: "GTX 1070", lengthMm: 267, slots: 2 },
-  { chip: "GTX 1070 Ti", lengthMm: 267, slots: 2 },
-  { chip: "GTX 1080", lengthMm: 267, slots: 2 },
-  { chip: "GTX 1080 Ti", lengthMm: 267, slots: 2 },
+  { chip: "GTX 1060 6 ГБ", lengthMm: 250, slots: 2, fans: 1 },
+  { chip: "GTX 1070", lengthMm: 267, slots: 2, fans: 1 },
+  { chip: "GTX 1070 Ti", lengthMm: 267, slots: 2, fans: 1 },
+  { chip: "GTX 1080", lengthMm: 267, slots: 2, fans: 1 },
+  { chip: "GTX 1080 Ti", lengthMm: 267, slots: 2, fans: 1 },
   { chip: "RTX 2060", lengthMm: 229, slots: 2 },
   { chip: "RTX 2060 SUPER", lengthMm: 229, slots: 2 },
   { chip: "RTX 2070", lengthMm: 229, slots: 2 },
@@ -112,4 +113,9 @@ const REFS: ReferenceCard[] = [
   { chip: "RTX 5090", lengthMm: 304, slots: 2 },
 ].map((r) => ({ ...r, brand: "NVIDIA", line: "Founders Edition", ...FE }) as ReferenceCard);
 
-export const GPU_NVIDIA: GpuSpec[] = buildGpuCatalogue("NVIDIA", CHIPS, LINES, REFS);
+/** ASUS sells ROG Strix "White" editions of its higher-end cards (availability per chip varies). */
+export const GPU_NVIDIA: GpuSpec[] = withColorVariants(buildGpuCatalogue("NVIDIA", CHIPS, LINES, REFS), (g) =>
+  g.line === "ROG Strix" && (g.releaseYear ?? 0) >= 2020 && g.boardPowerW >= 200
+    ? { base: "black", variants: [{ colorway: "white", color: "#e9eaee", accent: g.visual.accent, priceMul: 1.04, approximate: true }] }
+    : undefined,
+);

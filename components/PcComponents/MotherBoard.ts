@@ -21,25 +21,27 @@ interface Chipset {
   year: number;
   bios?: string[];
   unsupported?: string[];
+  /** false = memory runs at the CPU's official speed only (Intel H/B chipsets before the 500 series). */
+  memOc?: boolean;
 }
 
 const AM4_OLD_BIOS = [A.r2, A.r3, A.r3g, A.r5, A.r5g];
 
 const CHIPSETS: Record<string, Chipset> = {
-  H61: { chipset: "H61", socket: "LGA1155", memory: "DDR3", pcie: 2, m2: 0, m2Gen: 2, sata: 4, maxMemGb: 32, year: 2011, bios: [I.g3] },
+  H61: { chipset: "H61", socket: "LGA1155", memory: "DDR3", pcie: 2, m2: 0, m2Gen: 2, sata: 4, maxMemGb: 32, year: 2011, bios: [I.g3], memOc: false },
   Z77: { chipset: "Z77", socket: "LGA1155", memory: "DDR3", pcie: 3, m2: 0, m2Gen: 2, sata: 6, maxMemGb: 32, year: 2012 },
-  H81: { chipset: "H81", socket: "LGA1150", memory: "DDR3", pcie: 3, m2: 0, m2Gen: 2, sata: 4, maxMemGb: 32, year: 2013 },
-  B85: { chipset: "B85", socket: "LGA1150", memory: "DDR3", pcie: 3, m2: 0, m2Gen: 2, sata: 6, maxMemGb: 32, year: 2013 },
+  H81: { chipset: "H81", socket: "LGA1150", memory: "DDR3", pcie: 3, m2: 0, m2Gen: 2, sata: 4, maxMemGb: 32, year: 2013, memOc: false },
+  B85: { chipset: "B85", socket: "LGA1150", memory: "DDR3", pcie: 3, m2: 0, m2Gen: 2, sata: 6, maxMemGb: 32, year: 2013, memOc: false },
   Z87: { chipset: "Z87", socket: "LGA1150", memory: "DDR3", pcie: 3, m2: 0, m2Gen: 2, sata: 6, maxMemGb: 32, year: 2013 },
   Z97: { chipset: "Z97", socket: "LGA1150", memory: "DDR3", pcie: 3, m2: 1, m2Gen: 2, sata: 6, maxMemGb: 32, year: 2014 },
   "970": { chipset: "AMD 970", socket: "AM3+", memory: "DDR3", pcie: 2, m2: 0, m2Gen: 2, sata: 6, maxMemGb: 32, year: 2011 },
   Z170: { chipset: "Z170", socket: "LGA1151", memory: "DDR4", pcie: 3, m2: 1, m2Gen: 3, sata: 6, maxMemGb: 64, year: 2015, bios: [I.g7] },
   Z270: { chipset: "Z270", socket: "LGA1151", memory: "DDR4", pcie: 3, m2: 2, m2Gen: 3, sata: 6, maxMemGb: 64, year: 2017 },
   Z370: { chipset: "Z370", socket: "LGA1151-v2", memory: "DDR4", pcie: 3, m2: 2, m2Gen: 3, sata: 6, maxMemGb: 64, year: 2017, bios: [I.g9] },
-  B360: { chipset: "B360", socket: "LGA1151-v2", memory: "DDR4", pcie: 3, m2: 2, m2Gen: 3, sata: 6, maxMemGb: 64, year: 2018, bios: [I.g9] },
-  B365: { chipset: "B365", socket: "LGA1151-v2", memory: "DDR4", pcie: 3, m2: 2, m2Gen: 3, sata: 6, maxMemGb: 64, year: 2019 },
+  B360: { chipset: "B360", socket: "LGA1151-v2", memory: "DDR4", pcie: 3, m2: 2, m2Gen: 3, sata: 6, maxMemGb: 64, year: 2018, bios: [I.g9], memOc: false },
+  B365: { chipset: "B365", socket: "LGA1151-v2", memory: "DDR4", pcie: 3, m2: 2, m2Gen: 3, sata: 6, maxMemGb: 64, year: 2019, memOc: false },
   Z390: { chipset: "Z390", socket: "LGA1151-v2", memory: "DDR4", pcie: 3, m2: 2, m2Gen: 3, sata: 6, maxMemGb: 128, year: 2018 },
-  B460: { chipset: "B460", socket: "LGA1200", memory: "DDR4", pcie: 3, m2: 2, m2Gen: 3, sata: 6, maxMemGb: 128, year: 2020, unsupported: [I.g11] },
+  B460: { chipset: "B460", socket: "LGA1200", memory: "DDR4", pcie: 3, m2: 2, m2Gen: 3, sata: 6, maxMemGb: 128, year: 2020, unsupported: [I.g11], memOc: false },
   Z490: { chipset: "Z490", socket: "LGA1200", memory: "DDR4", pcie: 3, m2: 2, m2Gen: 3, sata: 6, maxMemGb: 128, year: 2020, bios: [I.g11] },
   B560: { chipset: "B560", socket: "LGA1200", memory: "DDR4", pcie: 4, m2: 2, m2Gen: 4, sata: 6, maxMemGb: 128, year: 2021 },
   Z590: { chipset: "Z590", socket: "LGA1200", memory: "DDR4", pcie: 4, m2: 3, m2Gen: 4, sata: 6, maxMemGb: 128, year: 2021 },
@@ -209,5 +211,6 @@ export const MOTHERBOARDS: MotherboardSpec[] = ROWS.map(([brand, model, key, for
     pcieX16Gen: c.pcie,
     biosUpdateFamilies: c.bios ?? [],
     unsupportedFamilies: c.unsupported ?? [],
+    memoryOverclock: c.memOc ?? true,
   } satisfies MotherboardSpec;
 }).sort((a, b) => (b.releaseYear ?? 0) - (a.releaseYear ?? 0) || a.price.amountRub - b.price.amountRub);

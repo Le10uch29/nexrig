@@ -35,6 +35,12 @@ export function profileFor(component: HardwareComponent): MotionProfile {
   return MOTION_PROFILES[component.category];
 }
 
+/** Profile with a placement-specific insertion direction (e.g. from the rear chamber). */
+export function profileForPlacement(p: { component: HardwareComponent; approach?: Vec3 }): MotionProfile {
+  const base = profileFor(p.component);
+  return p.approach ? { ...base, approach: p.approach } : base;
+}
+
 export interface Keyframe {
   position: Vec3;
   rotation: Vec3;

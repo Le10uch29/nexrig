@@ -24,6 +24,8 @@ export const gameSettingsSchema = z.object({
   preset: z.enum(["low", "medium", "high", "ultra"]),
   rayTracing: z.boolean(),
   upscaling: z.enum(["off", "quality", "balanced", "performance"]),
+  upscaler: z.enum(["DLSS", "FSR", "XeSS"]).nullable().optional(),
+  frameGen: z.boolean().optional(),
 });
 
 export const benchmarkInputSchema = z.object({
@@ -37,6 +39,10 @@ export const benchmarkInputSchema = z.object({
   sourceUrl: z.string().url().optional().or(z.literal("")),
   testDate: z.string().min(4),
   conditions: z.string().max(400).optional(),
+  testConfig: z.string().max(400).optional(),
+  method: z.string().max(200).optional(),
+  notes: z.string().max(600).optional(),
+  gameVersion: z.string().max(60).optional(),
   sampleCount: z.number().int().min(1).max(100),
 });
 

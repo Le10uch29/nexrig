@@ -1,17 +1,19 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { usePrice } from "@/features/settings/currency";
 import { Fragment, useMemo, useState } from "react";
 import { useBuildStore } from "@/features/build-state/store";
 import { hardwareRepository } from "@/lib/hardware/repository";
 import { keySpecs } from "@/lib/hardware/specs";
-import { formatPrice, useMessages } from "@/lib/i18n";
+import { useMessages } from "@/lib/i18n";
 import { CATEGORY_ORDER, type ComponentCategory } from "@/types/hardware";
 import { IconChevron, IconSearch } from "@/components/ui/icons";
 import { Badge, Button, cx, EmptyState, inputCls, Select } from "@/components/ui/primitives";
 import { ComponentThumb } from "./ComponentThumb";
 
 export function DatabaseView() {
+  const formatPrice = usePrice();
   const t = useMessages();
   const router = useRouter();
   const openCatalog = useBuildStore((s) => s.openCatalog);

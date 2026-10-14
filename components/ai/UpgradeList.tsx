@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
+import { usePrice } from "@/features/settings/currency";
 import { GAMES } from "@/data/games";
 import { requestInstall } from "@/features/build-state/install-action";
 import { upgradeOptions, type UpgradeOption } from "@/lib/agents/specialists";
-import { formatPrice, useMessages } from "@/lib/i18n";
+import { useMessages } from "@/lib/i18n";
 import type { GameSettings } from "@/types/benchmark";
 import type { BuildSelection } from "@/types/build";
 import { ComponentThumb } from "@/components/hardware/ComponentThumb";
@@ -33,6 +34,7 @@ export function sortUpgrades(options: UpgradeOption[], sort: UpgradeSort, opts: 
 }
 
 export function UpgradeRow({ o, current }: { o: UpgradeOption; current: number | null }) {
+  const formatPrice = usePrice();
   const t = useMessages();
   const gain = o.gainPct ?? 0;
   return (

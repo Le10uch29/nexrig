@@ -36,6 +36,8 @@ export interface GpuLine {
   covers: (c: GpuChip) => boolean;
   /** Optional per-chip line naming (e.g. MSI Ventus 2X/3X). */
   lineName?: (c: GpuChip) => string;
+  /** Whether the line has RGB/ARGB lighting. */
+  rgb?: boolean;
 }
 
 /** Reference / Founders Edition cards with known dimensions. */
@@ -46,6 +48,8 @@ export interface ReferenceCard {
   lengthMm: number;
   slots: number;
   power?: [GpuPowerConnector, number][];
+  /** Fan count of the reference design (1 = blower). */
+  fans?: number;
   color: string;
   accent: string;
 }
@@ -99,6 +103,7 @@ function card(
   visual: { color: string; accent: string },
   generated: boolean,
   power?: [GpuPowerConnector, number][],
+  look: { fans: number; rgb: boolean } = { fans: 2, rgb: false },
 ): GpuSpec {
   const vendorLabel = vendor === "NVIDIA" ? "GeForce" : "Radeon";
   return {
@@ -134,7 +139,18 @@ function card(
     rasterIndex: c.raster,
     rtIndex: c.rt ? Math.round(c.raster * (RT_FACTOR[c.arch] ?? 0.8)) : 0,
     upscalers: upscalersFor(c, vendor),
+    fans: look.fans,
+    rgb: look.rgb,
   };
+}
+
+/** Typical fan count for a partner design of this length and tier (template value). */
+function partnerFans(tier: LineTier, lengthMm: number, lineName: string) {
+  if (/2X/.test(lineName)) return 2;
+  if (/3X|Trio/.test(lineName)) return 3;
+  if (lengthMm < 190) return 1;
+  if (tier === "entry") return lengthMm > 285 ? 3 : 2;
+  return lengthMm > 255 ? 3 : 2;
 }
 
 /** Expands chips × partner lines (+ reference cards) into a sorted list of cards. */
@@ -142,14 +158,25 @@ export function buildGpuCatalogue(vendor: "NVIDIA" | "AMD", chips: GpuChip[], li
   const out: GpuSpec[] = [];
   for (const c of chips) {
     for (const ref of refs.filter((r) => r.chip === c.chip)) {
-      out.push(card(c, vendor, ref.brand, ref.line, { lengthMm: ref.lengthMm, slots: ref.slots }, 1.0, { color: ref.color, accent: ref.accent }, false, ref.power));
+      out.push(
+        card(c, vendor, ref.brand, ref.line, { lengthMm: ref.lengthMm, slots: ref.slots }, 1.0, { color: ref.color, accent: ref.accent }, false, ref.power, {
+          fans: ref.fans ?? 2,
+          rgb: false,
+        }),
+      );
     }
     for (const l of lines) {
       if (!l.covers(c)) continue;
       const t = TIER[l.tier];
       const lengthMm = Math.min(360, baseLength(c.tbpW) + t.lenAdd);
       const slots = Math.min(4, baseSlots(c.tbpW) + t.slotAdd);
-      out.push(card(c, vendor, l.brand, l.lineName?.(c) ?? l.line, { lengthMm, slots }, t.priceMul, { color: l.color, accent: l.accent }, true));
+      const name = l.lineName?.(c) ?? l.line;
+      out.push(
+        card(c, vendor, l.brand, name, { lengthMm, slots }, t.priceMul, { color: l.color, accent: l.accent }, true, undefined, {
+          fans: partnerFans(l.tier, lengthMm, name),
+          rgb: Boolean(l.rgb),
+        }),
+      );
     }
   }
   // Newest generation first, then fastest chip, then cheapest variant.

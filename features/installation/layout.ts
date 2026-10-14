@@ -102,6 +102,7 @@ export interface CaseGeometry {
   /** z of the motherboard's component-side face. */
   trayZ: number;
   shroudHeight: number;
+  dualChamber: boolean;
   /** Top-rear standoff position for any board form factor. */
   boardOrigin: Vec3;
 }
@@ -111,8 +112,11 @@ export function caseGeometry(c: CaseSpec): CaseGeometry {
   const height = c.exteriorMm.height * MM;
   const depth = c.exteriorMm.depth * MM;
   const wall = 0.06;
-  const trayZ = -width / 2 + 0.2;
-  const shroudHeight = c.supportedPsu.includes("ATX") ? 1.05 : 0.8;
+  const dual = c.layout === "dual-chamber";
+  // Dual-chamber cases: a ~95 mm rear chamber behind the tray holds the PSU on its side and the drives.
+  const trayZ = -width / 2 + (dual ? 1.0 : 0.2);
+  // No PSU shroud in compact (SFX: PSU above the GPU) or dual-chamber cases (bottom fan mounts instead).
+  const shroudHeight = dual || !c.supportedPsu.includes("ATX") ? 0 : 1.05;
   return {
     width,
     height,
@@ -120,6 +124,8 @@ export function caseGeometry(c: CaseSpec): CaseGeometry {
     wall,
     trayZ,
     shroudHeight,
-    boardOrigin: [-depth / 2 + 0.28, height - 0.32, trayZ],
+    dualChamber: dual,
+    // The board's rear edge (and the GPU bracket) sits 20 mm inside the rear exterior.
+    boardOrigin: [-depth / 2 + 0.2, height - 0.32, trayZ],
   };
 }

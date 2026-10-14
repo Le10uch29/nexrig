@@ -10,6 +10,19 @@ describe("PcComponents catalogue", () => {
     for (const cat of CATEGORY_ORDER) expect(ALL_COMPONENTS.some((c) => c.category === cat), cat).toBe(true);
   });
 
+  it("gives every GPU a fan count and lights only RGB product lines", () => {
+    const gpus = [...GPU_NVIDIA, ...GPU_AMD];
+    for (const g of gpus) expect(g.fans, g.id).toBeGreaterThanOrEqual(1);
+    // Blower reference designs.
+    expect(GPU_AMD.find((g) => g.line === "Reference" && g.chip === "RX 5700 XT")?.fans).toBe(1);
+    expect(GPU_NVIDIA.find((g) => g.line === "Founders Edition" && g.chip === "GTX 1080")?.fans).toBe(1);
+    expect(GPU_AMD.find((g) => g.line === "Reference" && g.chip === "RX 7900 XTX")?.fans).toBe(3);
+    // Reference cards and plain lines have no lighting; known RGB lines do.
+    expect(gpus.filter((g) => g.line === "Reference" || g.line === "Founders Edition").every((g) => !g.rgb)).toBe(true);
+    expect(gpus.filter((g) => g.line.startsWith("ROG Strix")).every((g) => g.rgb)).toBe(true);
+    expect(gpus.filter((g) => g.line.startsWith("Ventus")).some((g) => g.rgb)).toBe(false);
+  });
+
   it("covers GTX 1060 → RTX 5090 and RX 580 → RX 9070 XT", () => {
     const nv = new Set(GPU_NVIDIA.map((g) => g.chip));
     for (const chip of ["GTX 1060 6 ГБ", "GTX 1080 Ti", "GTX 1660 SUPER", "RTX 2080 Ti", "RTX 3060", "RTX 4070 SUPER", "RTX 5060 Ti 16 ГБ", "RTX 5090"]) expect(nv.has(chip), chip).toBe(true);

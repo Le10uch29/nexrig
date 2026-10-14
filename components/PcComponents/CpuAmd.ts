@@ -10,21 +10,23 @@ interface Fam {
   family: string;
   socket: CpuSocket;
   memory: MemoryType[];
+  /** Official memory speed per type, MT/s — what AMD specifies without EXPO/XMP. */
+  memSpeed: Partial<Record<MemoryType, number>>;
   pcie: PcieGen;
   igpu: boolean;
 }
 
 const FAM: Record<string, Fam> = {
-  fx: { family: "FX (Piledriver)", socket: "AM3+", memory: ["DDR3"], pcie: 2, igpu: false },
-  r1: { family: "Ryzen 1000", socket: "AM4", memory: ["DDR4"], pcie: 3, igpu: false },
-  r2: { family: "Ryzen 2000", socket: "AM4", memory: ["DDR4"], pcie: 3, igpu: false },
-  r3g: { family: "Ryzen 3000G (APU)", socket: "AM4", memory: ["DDR4"], pcie: 3, igpu: true },
-  r3: { family: "Ryzen 3000", socket: "AM4", memory: ["DDR4"], pcie: 4, igpu: false },
-  r5: { family: "Ryzen 5000", socket: "AM4", memory: ["DDR4"], pcie: 4, igpu: false },
-  r5g: { family: "Ryzen 5000G (APU)", socket: "AM4", memory: ["DDR4"], pcie: 3, igpu: true },
-  r7: { family: "Ryzen 7000", socket: "AM5", memory: ["DDR5"], pcie: 5, igpu: true },
-  r8g: { family: "Ryzen 8000G (APU)", socket: "AM5", memory: ["DDR5"], pcie: 4, igpu: true },
-  r9: { family: "Ryzen 9000", socket: "AM5", memory: ["DDR5"], pcie: 5, igpu: true },
+  fx: { family: "FX (Piledriver)", socket: "AM3+", memory: ["DDR3"], memSpeed: { DDR3: 1866 }, pcie: 2, igpu: false },
+  r1: { family: "Ryzen 1000", socket: "AM4", memory: ["DDR4"], memSpeed: { DDR4: 2666 }, pcie: 3, igpu: false },
+  r2: { family: "Ryzen 2000", socket: "AM4", memory: ["DDR4"], memSpeed: { DDR4: 2933 }, pcie: 3, igpu: false },
+  r3g: { family: "Ryzen 3000G (APU)", socket: "AM4", memory: ["DDR4"], memSpeed: { DDR4: 2933 }, pcie: 3, igpu: true },
+  r3: { family: "Ryzen 3000", socket: "AM4", memory: ["DDR4"], memSpeed: { DDR4: 3200 }, pcie: 4, igpu: false },
+  r5: { family: "Ryzen 5000", socket: "AM4", memory: ["DDR4"], memSpeed: { DDR4: 3200 }, pcie: 4, igpu: false },
+  r5g: { family: "Ryzen 5000G (APU)", socket: "AM4", memory: ["DDR4"], memSpeed: { DDR4: 3200 }, pcie: 3, igpu: true },
+  r7: { family: "Ryzen 7000", socket: "AM5", memory: ["DDR5"], memSpeed: { DDR5: 5200 }, pcie: 5, igpu: true },
+  r8g: { family: "Ryzen 8000G (APU)", socket: "AM5", memory: ["DDR5"], memSpeed: { DDR5: 5200 }, pcie: 4, igpu: true },
+  r9: { family: "Ryzen 9000", socket: "AM5", memory: ["DDR5"], memSpeed: { DDR5: 5600 }, pcie: 5, igpu: true },
 };
 
 // [model, family, cores, threads, base GHz, boost GHz, TDP, peak W, year, gamingIndex, demo price RUB]
@@ -98,6 +100,7 @@ export const CPU_AMD: CpuSpec[] = ROWS.map(([model, f, cores, threads, base, boo
     tdpW: tdp,
     peakPowerW: peak,
     memorySupport: fam.memory,
+    memorySpeedMtps: fam.memSpeed,
     pcieGen: fam.pcie,
     integratedGraphics: fam.igpu,
     gamingIndex: idx,

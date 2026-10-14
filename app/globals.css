@@ -38,6 +38,34 @@
   --dur-fast: 120ms;
   --dur-base: 200ms;
   --nav-h: 56px;
+
+  /* Semantic aliases (NexRig brief). Components may use either name; the values are shared. */
+  --background: var(--bg-0);
+  --surface: var(--panel);
+  --surface-raised: var(--panel-2);
+  --border: var(--line);
+  --primary: var(--violet);
+  --accent: var(--cyan);
+  --success: var(--ok);
+  --warning: var(--warn);
+  --danger: var(--bad);
+  --text-primary: var(--fg);
+  --text-secondary: var(--fg-2);
+  --text-muted: var(--fg-3);
+  /* 4px spacing grid */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  /* type scale */
+  --text-caption: 0.6875rem;
+  --text-body: 0.8125rem;
+  --text-title: 0.9375rem;
+  --text-heading: 1.25rem;
+  --leading-tight: 1.25;
+  --leading-body: 1.5;
   color-scheme: dark;
 }
 
@@ -64,6 +92,18 @@
   --color-bad: var(--bad);
   --color-bad-soft: var(--bad-soft);
   --color-info-soft: var(--info-soft);
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-accent: var(--accent);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);
   --radius-lg: var(--radius-lg);

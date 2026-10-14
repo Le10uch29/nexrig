@@ -21,7 +21,7 @@ Optional: copy `.env.example` to `.env.local` and set `ANTHROPIC_API_KEY` to ena
 
 | Area | Status |
 |---|---|
-| Hardware data | **Local demo dataset** (`data/components.ts`, 55 parts). Specs transcribed from manufacturer data, flagged “не сверено”, need verification. |
+| Hardware data | **Local demo catalogue** in `components/PcComponents/` (~1000 items): GpuNvidia (GTX 1060 → RTX 5090), GpuAmd (RX 580 → RX 9070 XT), CpuIntel, CpuAmd, Ram (DDR3 → DDR5, per module), CpuCoolers, PcCase, MotherBoard (DDR3 → DDR5), Ssd, Hdd, PowerBlock (≥ 500 W), CaseFans. Chip/model specs are transcribed and unverified; partner GPU cards and RAM capacity × speed combinations are generated from line templates and flagged “≈ прибл.” with a note; motherboard slot/port counts come from chipset profiles. |
 | Prices | **Demo figures** dated 2026-10-01. No live price source is connected. |
 | FPS | **No measured data ships with the app.** Values are estimates from a relative-performance model (`lib/benchmark-engine`), labelled as estimates with ±25% range and low confidence. Users can add their own measurements; exact matches replace the estimate. |
 | Compatibility | Deterministic rules (`features/compatibility/rules.ts`), 4 statuses: compatible / incompatible / requires verification / insufficient data. |
@@ -47,7 +47,9 @@ lib/
   benchmark-engine/       estimate model + measured-record lookup
   agents/                 specialists, coordinator, server-only LLM composer
   pricing/ validation/ i18n/
-data/                     demo components, games (model parameters), default build
+components/PcComponents/  hardware catalogue, one file per product group
+features/catalog/         step-by-step facets (e.g. GPU → brand → line → series → model)
+data/                     games (model parameters), default build
 tests/                    vitest suites
 supabase/migrations/      future database schema
 ```

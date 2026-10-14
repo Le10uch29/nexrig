@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { usePrice } from "@/features/settings/currency";
 import { GAMES } from "@/data/games";
 import { useMeasuredBenchmarks } from "@/features/benchmarks/measured-store";
 import { useBuildDerived } from "@/features/build-state/derived";
 import { useBuildStore } from "@/features/build-state/store";
-import { formatPrice, useMessages } from "@/lib/i18n";
+import { useMessages } from "@/lib/i18n";
 import type { CoordinatorResponse } from "@/types/agents";
 import { IconAlert, IconSend, IconSpark } from "@/components/ui/icons";
 import { Badge, Button, cx, inputCls, SectionTitle, StatusPill } from "@/components/ui/primitives";
@@ -60,6 +61,7 @@ function RichText({ text }: { text: string }) {
 }
 
 export function ExpertView() {
+  const formatPrice = usePrice();
   const t = useMessages();
   const { selection, resolved, report, total } = useBuildDerived();
   const perf = useBuildStore((s) => s.perf);

@@ -1,12 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { usePrice } from "@/features/settings/currency";
 import type { CandidateVerdict } from "@/features/compatibility/engine";
 import { keySpecs } from "@/lib/hardware/specs";
-import { formatPrice, useMessages } from "@/lib/i18n";
+import { useMessages } from "@/lib/i18n";
 import type { HardwareComponent } from "@/types/hardware";
 import { IconChevron } from "@/components/ui/icons";
 import { Button, cx, StatusIcon, StatusPill } from "@/components/ui/primitives";
+import { ColorSwatches } from "./ColorSwatches";
 import { ComponentThumb } from "./ComponentThumb";
 
 export function ComponentCard({
@@ -18,6 +20,8 @@ export function ComponentCard({
   onRemove,
   actionLabel,
   quantity,
+  variants,
+  onPickVariant,
 }: {
   component: HardwareComponent;
   verdict: CandidateVerdict;
@@ -28,7 +32,11 @@ export function ComponentCard({
   actionLabel: string;
   /** Memory: number of modules that will be installed (price shown per module + total). */
   quantity?: number;
+  /** Colour editions of this product (white/black); shows a colour switch. */
+  variants?: HardwareComponent[];
+  onPickVariant?: (c: HardwareComponent) => void;
 }) {
+  const formatPrice = usePrice();
   const t = useMessages();
   const [open, setOpen] = useState(false);
   const specs = keySpecs(component, open);
@@ -70,6 +78,11 @@ export function ComponentCard({
               </div>
             ))}
           </dl>
+          {variants && onPickVariant && variants.length > 1 && (
+            <div className="mt-2">
+              <ColorSwatches variants={variants} current={component.id} onPick={onPickVariant} />
+            </div>
+          )}
         </div>
       </div>
       <div className="mt-3 flex items-center justify-between gap-2">

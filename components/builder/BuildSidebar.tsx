@@ -1,8 +1,9 @@
 "use client";
 
 import { useBuildDerived } from "@/features/build-state/derived";
+import { usePrice } from "@/features/settings/currency";
 import { useBuildStore, type InspectorView } from "@/features/build-state/store";
-import { formatPrice, useMessages } from "@/lib/i18n";
+import { useMessages } from "@/lib/i18n";
 import { CATEGORY_ORDER } from "@/types/hardware";
 import { ComponentThumb } from "@/components/hardware/ComponentThumb";
 import { IconArrowUp, IconBookmark, IconCompare, IconCube, IconGauge, IconList, IconReset, IconShield } from "@/components/ui/icons";
@@ -11,7 +12,7 @@ import { Button, cx, StatusPill } from "@/components/ui/primitives";
 export function useInspectorNav() {
   const t = useMessages();
   const { report } = useBuildDerived();
-  const issues = report.counts.incompatible + report.counts.verify;
+  const issues = report.counts.incompatible + report.counts.warning;
   return [
     { id: "build" as InspectorView, label: t.sidebar.currentBuild, icon: IconList },
     { id: "catalog" as InspectorView, label: t.sidebar.workspace, icon: IconCube },
@@ -24,6 +25,7 @@ export function useInspectorNav() {
 }
 
 export function BuildSidebar() {
+  const formatPrice = usePrice();
   const t = useMessages();
   const { resolved, report, total } = useBuildDerived();
   const buildName = useBuildStore((s) => s.buildName);
