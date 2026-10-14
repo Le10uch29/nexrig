@@ -35,6 +35,9 @@ const CHIPSETS: Record<string, Chipset> = {
   Z87: { chipset: "Z87", socket: "LGA1150", memory: "DDR3", pcie: 3, m2: 0, m2Gen: 2, sata: 6, maxMemGb: 32, year: 2013 },
   Z97: { chipset: "Z97", socket: "LGA1150", memory: "DDR3", pcie: 3, m2: 1, m2Gen: 2, sata: 6, maxMemGb: 32, year: 2014 },
   "970": { chipset: "AMD 970", socket: "AM3+", memory: "DDR3", pcie: 2, m2: 0, m2Gen: 2, sata: 6, maxMemGb: 32, year: 2011 },
+  // 100-series boards were also sold in DDR3/DDR3L versions (for Skylake/Kaby Lake).
+  B150D3: { chipset: "B150", socket: "LGA1151", memory: "DDR3", pcie: 3, m2: 0, m2Gen: 3, sata: 6, maxMemGb: 32, year: 2015, bios: [I.g7], memOc: false },
+  H110D3: { chipset: "H110", socket: "LGA1151", memory: "DDR3", pcie: 3, m2: 0, m2Gen: 3, sata: 4, maxMemGb: 32, year: 2015, bios: [I.g7], memOc: false },
   Z170: { chipset: "Z170", socket: "LGA1151", memory: "DDR4", pcie: 3, m2: 1, m2Gen: 3, sata: 6, maxMemGb: 64, year: 2015, bios: [I.g7] },
   Z270: { chipset: "Z270", socket: "LGA1151", memory: "DDR4", pcie: 3, m2: 2, m2Gen: 3, sata: 6, maxMemGb: 64, year: 2017 },
   Z370: { chipset: "Z370", socket: "LGA1151-v2", memory: "DDR4", pcie: 3, m2: 2, m2Gen: 3, sata: 6, maxMemGb: 64, year: 2017, bios: [I.g9] },
@@ -90,6 +93,8 @@ const ROWS: Row[] = [
   ["Gigabyte", "GA-970A-DS3P", "970", "ATX", 4000],
   ["MSI", "970 GAMING", "970", "ATX", 4500],
   // DDR4 — Intel
+  ["Gigabyte", "GA-B150M-D3H DDR3", "B150D3", "mATX", 3500],
+  ["ASUS", "H110M-K D3", "H110D3", "mATX", 2500],
   ["ASUS", "Z170-A", "Z170", "ATX", 6500],
   ["MSI", "Z170A GAMING M5", "Z170", "ATX", 6500],
   ["ASUS", "PRIME Z270-A", "Z270", "ATX", 7000],

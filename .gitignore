@@ -43,3 +43,11 @@ next-env.d.ts
 !.env.example
 /.playwright-mcp
 
+
+# FPS Data Engine local store (no database connected)
+/.data/
+
+# Database dumps (may contain user data) — never commit
+/backups/
+# Supabase CLI cache
+/supabase/.temp/

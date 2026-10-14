@@ -1,4 +1,5 @@
 import { computeFit, type RadiatorOption } from "@/features/installation/fit";
+import { analyzeBalance } from "./balance";
 import { adapterPinsFor, estimatePeakPower, recommendedPsuWattage } from "@/lib/hardware/power";
 import type { ResolvedBuild } from "@/lib/hardware/repository";
 import { getMessages } from "@/lib/i18n";
@@ -589,6 +590,47 @@ export const fansRule: Rule = (b) => {
   return checks;
 };
 
+/**
+ * Balance between parts (model/rule based, never blocking): flags a strongly mismatched CPU/GPU pair
+ * and memory that holds the platform back. Percentages and wording come from balance.ts.
+ */
+export const balanceRule: Rule = (b) => {
+  if (!b.cpu || !b.gpu) return null;
+  const report = analyzeBalance(b);
+  const checks: CompatibilityCheck[] = [];
+  const pair = report.items.find((i) => i.id === "cpu-gpu")!;
+  // Warn when the CPU leaves the graphics card idle; being GPU-bound is the normal case for games
+  // and is only flagged when the mismatch is extreme.
+  const flagged = pair.status === "poor" || (pair.status === "fair" && pair.limiter === "cpu");
+  if (pair.scorePct !== null) {
+    checks.push(
+      check("balanceCpuGpu", {
+        rule: "balance-cpu-gpu",
+        status: flagged ? "warning" : "compatible",
+        severity: !flagged ? undefined : pair.status === "poor" ? "major" : "minor",
+        detail: `Баланс ~${pair.scorePct}%. ${pair.summary} ${pair.detail}`,
+        resolution: pair.advice ?? m.balanceCpuGpu.resolution,
+        categories: ["cpu", "gpu"],
+      }),
+    );
+  }
+  const ram = report.items.find((i) => i.id === "ram")!;
+  // Channel count is reported by the memory-population check; here only capacity/type/platform.
+  if (b.ram && ram.scorePct !== null && ram.status !== "good" && (b.ram.moduleSizeGb * b.ramCount < 16 || b.ram.type === "DDR3")) {
+    checks.push(
+      check("balanceRam", {
+        rule: "balance-ram",
+        status: "warning",
+        severity: ram.status === "poor" ? "major" : "minor",
+        detail: `Соответствие ~${ram.scorePct}%. ${ram.detail}`,
+        resolution: ram.advice ?? m.balanceRam.resolution,
+        categories: ["ram", "cpu", "gpu"],
+      }),
+    );
+  }
+  return checks;
+};
+
 export const RULES: Rule[] = [
   completenessRule,
   socketRule,
@@ -611,4 +653,5 @@ export const RULES: Rule[] = [
   psuFormFactorRule,
   storageRule,
   fansRule,
+  balanceRule,
 ];

@@ -62,13 +62,78 @@ export interface BenchmarkRecord {
   conditions?: string;
   notes?: string;
   sampleCount: number;
+  // Optional provenance and test-system fields (FPS Data Engine). Unknown values stay undefined.
+  /** Data source id (see DataSourceInfo), e.g. "nexrig", "tomshardware". */
+  sourceId?: string;
+  ramGb?: number;
+  ramType?: "DDR3" | "DDR4" | "DDR5";
+  /** Only with a stated measurement method. */
+  minFps?: number;
+  minFpsMethod?: string;
+  cpuUtil?: number;
+  gpuUtil?: number;
+  os?: string;
+  driver?: string;
+  verification?: VerificationStatus;
+  importBatchId?: string;
+  /** Auth user who submitted the measurement (community submissions). Never exposed publicly. */
+  submittedBy?: string;
+  createdAt?: string;
+}
+
+export type VerificationStatus = "unverified" | "verified" | "rejected";
+
+export type SourceStatus = "active" | "not_configured" | "disabled" | "error";
+export type SourceIntegration = "api" | "licensed-dataset" | "manual-import" | "local-catalogue" | "model";
+
+/** A data source as shown to users; never "active" unless the connection actually works. */
+export interface DataSourceInfo {
+  id: string;
+  name: string;
+  baseUrl: string | null;
+  integration: SourceIntegration;
+  status: SourceStatus;
+  lastSyncAt: string | null;
+  lastErrorAt: string | null;
+  /** Without secrets. */
+  errorMessage: string | null;
+  attribution: string;
+  updateMode: "manual" | "scheduled" | "none";
+  description: string;
+}
+
+/** Reliability level shown to the user. */
+export type FpsConfidenceLevel = "verified" | "close" | "model" | "insufficient";
+
+/** Engine output (FPS Data Engine contract). Unknown values are null, never 0. */
+export interface FpsEstimate {
+  level: FpsConfidenceLevel;
+  averageFpsEstimate: number | null;
+  /** Range bounds; null for a single measurement (no invented spread). */
+  lowFpsEstimate: number | null;
+  highFpsEstimate: number | null;
+  onePercentLow: number | null;
+  /** Presented FPS with frame generation (interpolated frames), reported separately. */
+  frameGenFps: number | null;
+  confidence: Confidence | null;
+  confidenceReasons: string[];
+  dataSource: string | null;
+  sourceUrl: string | null;
+  benchmarkDate: string | null;
+  gameVersion: string | null;
+  calculationMethod: string;
+  limitations: string[];
+  /** Records the result is based on (measured or calibration anchors). */
+  recordCount: number;
+  bottleneck: "gpu" | "cpu" | "balanced" | null;
 }
 
 export type Confidence = "low" | "medium" | "high";
 
 export interface ModelBreakdown {
   avgFps: number;
-  low1Fps: number;
+  /** Only when backed by real 1% low measurements (calibration); the model alone has none. */
+  low1Fps: number | null;
   rangeFps: [number, number];
   /** FPS ceiling from the GPU side alone (model). */
   gpuBoundFps: number;
@@ -98,6 +163,8 @@ export type PerformanceResult =
       rangeFps: [number, number] | null;
       records: BenchmarkRecord[];
       confidence: Confidence;
+      /** The records were taken with frame generation: avgFps counts interpolated frames. */
+      frameGenIncluded: boolean;
     }
   | ({ kind: "calibrated"; calibrationRecords: number } & ModelBreakdown)
   | ({ kind: "estimated" } & ModelBreakdown)

@@ -45,9 +45,12 @@ describe("benchmark engine", () => {
     const r = getPerformance({ game, cpu, gpu, settings, measured: [record] });
     expect(r.kind).toBe("measured");
     if (r.kind === "measured") expect(r.avgFps).toBe(101);
-    const other = getPerformance({ game, cpu, gpu, settings: { ...settings, preset: "ultra" }, measured: [record] });
-    // Same GPU and game, other preset: the model is calibrated by the record, not presented as measured.
-    expect(other.kind).toBe("calibrated");
+    // Same GPU, game and preset at another resolution: the record calibrates the model (close test).
+    const close = getPerformance({ game, cpu, gpu, settings: { ...settings, resolution: settings.resolution === "4K" ? "1080p" : "4K" }, measured: [record] });
+    expect(close.kind).toBe("calibrated");
+    // Another preset: results are never transferred across presets — plain model estimate.
+    const other = getPerformance({ game, cpu, gpu, settings: { ...settings, preset: settings.preset === "ultra" ? "high" : "ultra" }, measured: [record] });
+    expect(other.kind).toBe("estimated");
   });
 
   it("falls back to raster with a stated assumption on GPUs without hardware RT", () => {

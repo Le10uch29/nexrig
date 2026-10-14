@@ -75,11 +75,14 @@ export function FpsResult({ result, target }: { result: PerformanceResult; targe
             {measured ? "" : "~"}
             {result.avgFps}
           </p>
-          <p className="mt-1 text-[11px] text-fg-3">{t.perf.avg}</p>
+          <p className="mt-1 text-[11px] text-fg-3">{measured && result.frameGenIncluded ? "Средний FPS с генерацией кадров (вставленные кадры)" : t.perf.avg}</p>
         </div>
         <div>
           <p className="num text-xl leading-none font-medium text-fg-2">{result.low1Fps ?? "—"}</p>
-          <p className="mt-1 text-[11px] text-fg-3">{t.perf.low1}</p>
+          <p className="mt-1 text-[11px] text-fg-3" title={result.low1Fps === null ? "Нужны замеры времени кадра; модель 1% low не оценивает." : undefined}>
+            {t.perf.low1}
+            {result.low1Fps === null ? " · нет данных" : ""}
+          </p>
         </div>
         {result.kind !== "measured" && result.frameGenFps && (
           <div>

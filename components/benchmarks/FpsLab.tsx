@@ -11,10 +11,12 @@ import { useSavedBuilds } from "@/features/build-state/saved-builds";
 import { useBuildStore } from "@/features/build-state/store";
 import { upgradeOptions } from "@/lib/agents/specialists";
 import { getPerformance, memoryOf, targetVerdict, type MemoryConfig } from "@/lib/benchmark-engine/estimate";
-import { BENCHMARK_SOURCES } from "@/lib/benchmark-engine/sources";
+import { fpsCaveats, LEVEL_LABEL, toFpsEstimate } from "@/lib/fps-engine/engine";
+import { analyzeBalance } from "@/features/compatibility/balance";
+import { BalancePanel } from "@/components/compatibility/BalancePanel";
 import { hardwareRepository, resolveBuild } from "@/lib/hardware/repository";
 import { useMessages } from "@/lib/i18n";
-import { RESOLUTION_PIXELS, type GameSettings, type PerformanceResult, type Resolution } from "@/types/benchmark";
+import { RESOLUTION_PIXELS, type FpsConfidenceLevel, type GameSettings, type GraphicsPreset, type PerformanceResult, type Resolution } from "@/types/benchmark";
 import type { CpuSpec, GpuSpec } from "@/types/hardware";
 import { ConflictDialog } from "@/components/builder/ConflictDialog";
 import { Badge, Button, cx, EmptyState, Field, SectionTitle, Select } from "@/components/ui/primitives";
@@ -22,8 +24,12 @@ import { FpsBars } from "./FpsBars";
 import { FpsResult, KIND_LABEL, KIND_TONE, TargetBadge } from "./FpsResult";
 import { MeasuredRecords } from "./MeasuredRecords";
 import { PerformanceControls } from "./PerformanceControls";
+import { useSourceStatuses, useVerifiedRecords } from "./useServerData";
 
 const RESOLUTIONS: Resolution[] = ["1080p", "1440p", "4K"];
+const PRESETS: GraphicsPreset[] = ["low", "medium", "high", "ultra"];
+const LEVEL_TONE: Record<FpsConfidenceLevel, "cyan" | "violet" | "neutral" | "warn"> = { verified: "cyan", close: "violet", model: "neutral", insufficient: "warn" };
+const SOURCE_STATUS_LABEL = { active: "активен", not_configured: "не подключён", disabled: "отключён", error: "ошибка" } as const;
 
 interface Rig {
   cpu?: CpuSpec;
@@ -58,11 +64,11 @@ function deltaText(a: PerformanceResult, b: PerformanceResult) {
 export function FpsLab() {
   const formatPrice = usePrice();
   const t = useMessages();
-  const { resolved } = useBuildDerived();
+  const { resolved, report } = useBuildDerived();
   const perf = useBuildStore((s) => s.perf);
   const selection = useBuildStore((s) => s.selection);
   const setPerf = useBuildStore((s) => s.setPerf);
-  const measured = useMeasuredBenchmarks((s) => s.records);
+  const ownRecords = useMeasuredBenchmarks((s) => s.records);
   const saved = useSavedBuilds((s) => s.builds);
   const chips = useChipOptions();
   const target = perf.targetFps ?? 144;
@@ -89,9 +95,19 @@ export function FpsLab() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [altSaved, altGpu, altCpu, saved, resolved]);
 
+  const server = useVerifiedRecords([current.gpu?.id, alt?.gpu?.id]);
+  const sources = useSourceStatuses();
+  const measured = [...ownRecords, ...server.records];
   const perfFor = (rig: Rig, g = game, s: GameSettings = settings) => getPerformance({ game: g, cpu: rig.cpu, gpu: rig.gpu, settings: s, measured, memory: rig.memory });
   const main = perfFor(current);
   const altMain = alt ? perfFor(alt) : null;
+
+  const provenance = toFpsEstimate(main, game);
+  const presetGroups = PRESETS.map((preset) => ({
+    label: t.perf.presets[preset],
+    values: [perfFor(current, game, { ...settings, preset }), ...(alt ? [perfFor(alt, game, { ...settings, preset })] : [])],
+  }));
+  const balance = analyzeBalance(resolved, settings);
 
   const resolutionGroups = RESOLUTIONS.map((res) => ({
     label: res,
@@ -172,17 +188,60 @@ export function FpsLab() {
           <SectionTitle>
             {game.title} · {RESOLUTION_PIXELS[settings.resolution]}
           </SectionTitle>
+          {fpsCaveats(report.checks).slice(0, 2).map((c) => (
+            <p key={c} role="alert" className="rounded-[var(--radius-md)] border border-bad/40 bg-bad-soft p-2.5 text-[12px] text-bad">
+              {c}
+            </p>
+          ))}
           <FpsResult result={main} target={target} />
+          <Panel className="space-y-2 text-[12px]">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[11px] font-semibold tracking-wide text-fg-3 uppercase">Происхождение результата</p>
+              <Badge tone={LEVEL_TONE[provenance.level]}>{LEVEL_LABEL[provenance.level]}</Badge>
+            </div>
+            <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1">
+              <dt className="text-fg-3">Источник</dt>
+              <dd className="text-fg-2">
+                {provenance.dataSource ?? "—"}
+                {provenance.sourceUrl && (
+                  <>
+                    {" · "}
+                    <a href={provenance.sourceUrl} target="_blank" rel="noreferrer noopener" className="text-violet hover:underline">
+                      ссылка
+                    </a>
+                  </>
+                )}
+              </dd>
+              <dt className="text-fg-3">Дата теста</dt>
+              <dd className="text-fg-2">{provenance.benchmarkDate ?? "— (не замер)"}</dd>
+              <dt className="text-fg-3">Версия игры</dt>
+              <dd className="text-fg-2">{provenance.gameVersion ?? "неизвестна"}</dd>
+              <dt className="text-fg-3">Метод</dt>
+              <dd className="text-fg-2">{provenance.calculationMethod}</dd>
+            </dl>
+            <ul className="list-disc space-y-0.5 pl-4 text-[11.5px] text-fg-3">
+              {provenance.confidenceReasons.map((r) => (
+                <li key={r}>{r}</li>
+              ))}
+            </ul>
+            {server.error && <p className="text-[11px] text-warn">База NexRig недоступна ({server.error}) — расчёт без её замеров.</p>}
+          </Panel>
           {bottleneckAdvice && (
             <Panel className="text-[12.5px] leading-relaxed text-fg-2">
               <p className="mb-1 text-[11px] font-semibold tracking-wide text-fg-3 uppercase">Узкое место</p>
               {bottleneckAdvice}
             </Panel>
           )}
+          <Panel>
+            <BalancePanel report={balance} />
+          </Panel>
         </div>
         <div className="space-y-4">
           <Panel>
             <FpsBars caption="Разрешения · средний FPS (линия — диапазон)" groups={resolutionGroups} series={[{ key: "cur", label: current.label }, ...(alt ? [{ key: "alt", label: alt.label }] : [])]} target={target} />
+          </Panel>
+          <Panel>
+            <FpsBars caption={`Пресеты · ${settings.resolution}`} groups={presetGroups} series={[{ key: "cur", label: current.label }, ...(alt ? [{ key: "alt", label: alt.label }] : [])]} target={target} />
           </Panel>
           <Panel>
             <SectionTitle>Наибольший прирост · {game.title}</SectionTitle>
@@ -337,15 +396,30 @@ export function FpsLab() {
       <MeasuredRecords />
 
       <Panel>
-        <SectionTitle>Источники данных</SectionTitle>
-        <ul className="mt-3 grid gap-2.5 md:grid-cols-3">
-          {BENCHMARK_SOURCES.map((s) => (
-            <li key={s.id} className="rounded-[var(--radius-md)] border border-line bg-panel-2/60 p-3 text-[12px]">
+        <SectionTitle aside={sources.data ? <span className="text-[11px] text-fg-3">Проверенных замеров в базе: {sources.data.verifiedRecords}</span> : undefined}>Источники данных</SectionTitle>
+        {sources.error && <p className="mt-2 text-[11.5px] text-warn">Не удалось получить статусы источников ({sources.error}).</p>}
+        {!sources.data && !sources.error && <p className="mt-2 text-[11.5px] text-fg-3">Проверяем источники…</p>}
+        <ul className="mt-3 grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
+          <li className="rounded-[var(--radius-md)] border border-line bg-panel-2/60 p-3 text-[12px]">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-semibold">Открытые замеры пользователей</span>
+              <Badge tone="cyan">активен</Badge>
+            </div>
+            <p className="mt-1.5 leading-relaxed text-fg-3">Реальные результаты, которые пользователи NexRig отправляют ниже. После проверки администратором они видны всем и используются в расчётах.</p>
+          </li>
+          {sources.data?.items.map((src) => (
+            <li key={src.id} className="rounded-[var(--radius-md)] border border-line bg-panel-2/60 p-3 text-[12px]">
               <div className="flex items-center justify-between gap-2">
-                <span className="font-semibold">{s.label}</span>
-                <Badge tone={s.status === "active" ? (s.tier === "measured" ? "cyan" : "neutral") : "warn"}>{s.status === "active" ? "активен" : "не подключён"}</Badge>
+                <span className="font-semibold">{src.name}</span>
+                <Badge tone={src.status === "active" ? "cyan" : src.status === "error" ? "warn" : "neutral"}>{SOURCE_STATUS_LABEL[src.status]}</Badge>
               </div>
-              <p className="mt-1.5 leading-relaxed text-fg-3">{s.description}</p>
+              <p className="mt-1.5 leading-relaxed text-fg-3">{src.description}</p>
+              {src.errorMessage && <p className="mt-1 text-[11px] text-bad">{src.errorMessage}</p>}
+              {src.baseUrl && (
+                <a href={src.baseUrl} target="_blank" rel="noreferrer noopener" className="mt-1 inline-block text-[11px] text-violet hover:underline">
+                  {new URL(src.baseUrl).hostname}
+                </a>
+              )}
             </li>
           ))}
         </ul>

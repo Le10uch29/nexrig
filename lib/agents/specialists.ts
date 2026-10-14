@@ -213,14 +213,14 @@ export function priceAgent(build: ResolvedBuild): AgentResult {
     const rank = gpus.findIndex((g) => g.id === build.gpu!.id) + 1;
     findings.push({
       severity: rank <= 3 ? "positive" : "info",
-      text: `Видеокарта: ${rubPerPoint(build.gpu.price.amountRub, build.gpu.rasterIndex)} ₽ за пункт индекса — ${rank}-е место из ${gpus.length} по цене/производительности в наборе.`,
+      text: `Видеокарта: ${formatPrice(Number(rubPerPoint(build.gpu.price.amountRub, build.gpu.rasterIndex)))} за пункт индекса — ${rank}-е место из ${gpus.length} по цене/производительности в наборе.`,
     });
   }
   if (build.cpu) {
     const rank = cpus.findIndex((c) => c.id === build.cpu!.id) + 1;
     findings.push({
       severity: rank <= 3 ? "positive" : "info",
-      text: `Процессор: ${rank}-е место из ${cpus.length} по игровому индексу на рубль.`,
+      text: `Процессор: ${rank}-е место из ${cpus.length} по игровому индексу на единицу цены.`,
     });
   }
   const peak = estimatePeakPower(build);

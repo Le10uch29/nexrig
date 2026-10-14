@@ -6,6 +6,8 @@ import { useEffect, useRef, useState } from "react";
 import { useSavedBuilds } from "@/features/build-state/saved-builds";
 import { useBuildStore } from "@/features/build-state/store";
 import { CURRENCIES, RATES_AS_OF, RUB_PER_UNIT, useCurrencyStore } from "@/features/settings/currency";
+import { useAuth, useAuthDialog } from "@/features/auth/use-auth";
+import { getBrowserSupabase } from "@/lib/supabase/client";
 import { useMessages } from "@/lib/i18n";
 import { IconArrowUp, IconCube, IconDatabase, IconGauge, IconMenu, IconSpark, IconUser } from "@/components/ui/icons";
 import { cx } from "@/components/ui/primitives";
@@ -131,6 +133,8 @@ function ProfileMenu() {
   const [open, setOpen] = useState(false);
   const count = useSavedBuilds((s) => s.builds.length);
   const setInspector = useBuildStore((s) => s.setInspector);
+  const auth = useAuth();
+  const showAuth = useAuthDialog((s) => s.show);
   const router = useRouter();
   const ref = useRef<HTMLDivElement>(null);
 
@@ -146,25 +150,58 @@ function ProfileMenu() {
     };
   }, [open]);
 
+  const signOut = async () => {
+    setOpen(false);
+    await getBrowserSupabase()?.auth.signOut();
+    router.refresh();
+  };
+
+  // Signed out: a direct "Sign in" button opens the dialog.
+  if (auth.status === "signed-out") {
+    return (
+      <button
+        type="button"
+        onClick={() => showAuth("login")}
+        className="inline-flex h-9 items-center gap-2 rounded-[var(--radius-md)] border border-line bg-panel px-3 text-[13px] font-medium text-fg-2 hover:border-line-strong hover:text-fg"
+      >
+        <IconUser width={14} height={14} />
+        <span className="hidden sm:inline">Войти</span>
+      </button>
+    );
+  }
+
+  const user = auth.user;
+  const initial = user?.email?.[0]?.toUpperCase();
   return (
     <div ref={ref} className="relative">
       <button
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={t.nav.profile}
+        aria-label={user ? `Профиль: ${user.email ?? ""}` : t.nav.profile}
         onClick={() => setOpen((v) => !v)}
         className="inline-flex h-9 items-center gap-2 rounded-[var(--radius-md)] border border-line bg-panel px-2 text-fg-2 hover:text-fg"
       >
-        <span className="grid size-6 place-items-center rounded-full bg-panel-3 text-fg-2">
-          <IconUser width={14} height={14} />
+        <span className={cx("grid size-6 place-items-center rounded-full text-[11px] font-semibold", user ? "bg-violet-soft text-violet" : "bg-panel-3 text-fg-2")}>
+          {initial ?? <IconUser width={14} height={14} />}
         </span>
         <span className="num hidden text-xs sm:inline">{count}</span>
       </button>
       {open && (
         <div role="menu" className="animate-in absolute right-0 z-50 mt-2 w-72 rounded-[var(--radius-lg)] border border-line-strong bg-panel p-3 shadow-pop">
-          <p className="text-sm font-semibold">{t.nav.localProfile}</p>
-          <p className="mt-1 text-xs leading-relaxed text-fg-3">{t.nav.localProfileHint}</p>
+          {user ? (
+            <>
+              <p className="truncate text-sm font-semibold" title={user.email ?? undefined}>
+                {user.email}
+              </p>
+              <p className="mt-0.5 text-xs text-fg-3">{user.isAdmin ? "Администратор" : "Пользователь"}</p>
+            </>
+          ) : (
+            <>
+              <p className="text-sm font-semibold">{t.nav.localProfile}</p>
+              <p className="mt-1 text-xs leading-relaxed text-fg-3">{t.nav.localProfileHint}</p>
+            </>
+          )}
           <button
             role="menuitem"
             type="button"
@@ -178,6 +215,21 @@ function ProfileMenu() {
             {t.nav.savedBuilds}
             <span className="num text-xs text-fg-3">{count}</span>
           </button>
+          {user?.isAdmin && (
+            <Link
+              role="menuitem"
+              href="/admin/benchmarks"
+              onClick={() => setOpen(false)}
+              className="mt-1.5 flex w-full items-center rounded-[var(--radius-sm)] border border-line bg-panel-2 px-3 py-2 text-sm hover:border-line-strong"
+            >
+              Администрирование бенчмарков
+            </Link>
+          )}
+          {user && (
+            <button role="menuitem" type="button" onClick={signOut} className="mt-1.5 w-full rounded-[var(--radius-sm)] px-3 py-2 text-left text-sm text-fg-2 hover:bg-panel-2 hover:text-fg">
+              Выйти
+            </button>
+          )}
         </div>
       )}
     </div>

@@ -156,12 +156,16 @@ export function estimateFps({ game, cpu, gpu, settings, memory }: EstimateInput)
   );
   if (eff.upscaler) assumptions.push(`Апскейлинг: ${eff.upscaler}, режим «${eff.upscaling}» — прирост задан коэффициентом модели.`);
   if (eff.frameGen) assumptions.push(`${eff.frameGen}: показанный FPS включает сгенерированные кадры; задержка ввода соответствует базовому FPS.`);
+  if (bottleneck === "cpu") {
+    assumptions.push("Упор в процессор: FPS почти не зависит от разрешения и настроек графики — поэтому значения на разных разрешениях близки или совпадают.");
+  }
 
   const round = (n: number) => Math.max(1, Math.round(n));
   return {
     kind: "estimated",
     avgFps: round(avg),
-    low1Fps: round(avg * game.model.lowRatio),
+    // A 1% low needs frame-time data; the model has none (lowRatio is only a display hint, unused here).
+    low1Fps: null,
     rangeFps: [round(avg * (1 - UNCERTAINTY)), round(avg * (1 + UNCERTAINTY))],
     gpuBoundFps: round(gpuFps),
     cpuBoundFps: round(cpuFps),
@@ -212,11 +216,35 @@ export interface PerformanceQuery {
   memory?: MemoryConfig;
 }
 
-/** Measured data wins; then a model calibrated on real records; then a model estimate; else "unavailable". */
-export function getPerformance({ game, cpu, gpu, settings, measured, memory }: PerformanceQuery): PerformanceResult {
+/** Model figures carry ±25% uncertainty: show them to the nearest 5 FPS, not to the unit. */
+export function roundModelFps(n: number) {
+  return n >= 40 ? Math.max(5, Math.round(n / 5) * 5) : Math.max(1, Math.round(n));
+}
+
+/**
+ * Records may only calibrate the model when they were taken with the same preset, ray tracing,
+ * upscaling and frame generation state — results are never transferred across those.
+ * Resolution and CPU may differ (the model accounts for them).
+ */
+export function comparableForCalibration(r: GameSettings, q: GameSettings) {
+  return (
+    r.preset === q.preset &&
+    r.rayTracing === q.rayTracing &&
+    r.upscaling === q.upscaling &&
+    (q.upscaling === "off" || (r.upscaler ?? null) === (q.upscaler ?? null)) &&
+    Boolean(r.frameGen) === Boolean(q.frameGen)
+  );
+}
+
+/** Measured data wins; then a model calibrated on close real records; then a model estimate; else "unavailable". */
+export function getPerformance({ game, cpu, gpu, settings, measured: all, memory }: PerformanceQuery): PerformanceResult {
+  // Rejected records never count.
+  const measured = all.filter((r) => r.verification !== "rejected");
   if (!game) return { kind: "unavailable", reason: "Игра не выбрана." };
   if (!cpu) return { kind: "unavailable", reason: "Недостаточно данных для точной оценки: в сборке нет процессора." };
   if (!gpu) return { kind: "unavailable", reason: "Недостаточно данных для точной оценки: в сборке нет дискретной видеокарты (встроенная графика моделью не оценивается)." };
+  const usable = (n: number | undefined) => typeof n === "number" && Number.isFinite(n) && n > 0;
+  const modelReady = usable(cpu.gamingIndex) && usable(gpu.rasterIndex) && usable(game.model.gpuFps1440High) && usable(game.model.cpuFpsCap);
 
   const matches = findMeasured(measured, { gameId: game.id, cpuId: cpu.id, gpuId: gpu.id, settings });
   if (matches.length) {
@@ -230,24 +258,33 @@ export function getPerformance({ game, cpu, gpu, settings, measured, memory }: P
       rangeFps: matches.length > 1 ? [Math.min(...avgs), Math.max(...avgs)] : null,
       records: matches,
       confidence: measuredConfidence(matches),
+      frameGenIncluded: Boolean(settings.frameGen),
     };
+  }
+
+  // Without performance indices the model has no basis: say so instead of producing a number.
+  if (!modelReady) {
+    return { kind: "unavailable", reason: `Недостаточно данных для точной оценки: для ${!usable(cpu.gamingIndex) ? cpu.name : !usable(gpu.rasterIndex) ? gpu.name : game.title} нет параметров модели, а подходящих замеров нет.` };
   }
 
   const estimate = estimateFps({ game, cpu, gpu, settings, memory });
 
   // Calibration: real records of the same GPU in this game (any CPU/settings) correct the model.
-  const anchors = measured.filter((r) => r.gameId === game.id && r.gpuId === gpu.id);
+  const anchors = measured.filter((r) => r.gameId === game.id && r.gpuId === gpu.id && comparableForCalibration(r.settings, settings));
   const ratios = anchors
     .map((r) => {
       const rCpu = hardwareRepository.byId(r.cpuId);
       if (!rCpu || rCpu.category !== "cpu") return null;
-      const modelled = estimateFps({ game, cpu: rCpu, gpu, settings: r.settings }).avgFps;
+      const m = estimateFps({ game, cpu: rCpu, gpu, settings: r.settings });
+      // Frame-generation records report presented frames: compare them with the model's presented FPS.
+      const modelled = r.settings.frameGen ? (m.frameGenFps ?? m.avgFps) : m.avgFps;
       return r.avgFps / modelled;
     })
     .filter((x): x is number => x !== null && Number.isFinite(x));
+  const lowRatios = anchors.filter((r) => r.low1Fps && r.avgFps > 0).map((r) => r.low1Fps! / r.avgFps);
   if (ratios.length) {
     const k = Math.max(0.5, Math.min(1.8, median(ratios)));
-    const round = (n: number) => Math.max(1, Math.round(n));
+    const round = roundModelFps;
     const avg = estimate.avgFps * k;
     // Copy the breakdown without the "estimated" tag — the tier is set explicitly below.
     const { kind: _estimatedKind, ...breakdown } = estimate;
@@ -255,17 +292,27 @@ export function getPerformance({ game, cpu, gpu, settings, measured, memory }: P
     const calibrated: ModelBreakdown = {
       ...breakdown,
       avgFps: round(avg),
-      low1Fps: round(estimate.low1Fps * k),
+      // 1% low only from records that measured it (ratio to their own average).
+      low1Fps: lowRatios.length ? round(avg * median(lowRatios)) : null,
       rangeFps: [round(avg * (1 - CALIBRATED_UNCERTAINTY)), round(avg * (1 + CALIBRATED_UNCERTAINTY))],
       gpuBoundFps: round(estimate.gpuBoundFps * k),
       frameGenFps: estimate.frameGenFps ? round(estimate.frameGenFps * k) : null,
       confidence: "medium",
       method: `${MODEL_VERSION}, калибровка по ${ratios.length} замер(ам) этой видеокарты в игре (коэффициент ${k.toFixed(2)})`,
-      assumptions: [...estimate.assumptions, "Оценка скорректирована по реальным замерам той же видеокарты в этой игре при других настройках или с другим CPU."],
+      assumptions: [...estimate.assumptions, "Оценка скорректирована по реальным замерам той же видеокарты в этой игре с тем же пресетом, RT и генерацией кадров (другое разрешение или процессор)."],
     };
     return { ...calibrated, kind: "calibrated", calibrationRecords: ratios.length };
   }
-  return estimate;
+  const r5 = roundModelFps;
+  return {
+    ...estimate,
+    avgFps: r5(estimate.avgFps),
+    low1Fps: null,
+    rangeFps: [r5(estimate.rangeFps[0]), r5(estimate.rangeFps[1])],
+    gpuBoundFps: r5(estimate.gpuBoundFps),
+    cpuBoundFps: r5(estimate.cpuBoundFps),
+    frameGenFps: estimate.frameGenFps ? r5(estimate.frameGenFps) : null,
+  };
 }
 
 export type TargetVerdict = "meets" | "borderline" | "misses";

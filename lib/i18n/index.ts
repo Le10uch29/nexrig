@@ -1,3 +1,4 @@
+import { DEFAULT_CURRENCY, formatMoney } from "@/lib/money";
 import { ru, type Messages } from "./ru";
 
 /** Single active locale for now. Swap to a context/provider when more locales are added. */
@@ -12,11 +13,11 @@ export function useMessages(): Messages {
   return ACTIVE;
 }
 
-const rub = new Intl.NumberFormat(ru.locale, { style: "currency", currency: ru.currency, maximumFractionDigits: 0 });
 const num = new Intl.NumberFormat(ru.locale);
 
+/** Non-React contexts (agents, server) format in the default display currency (USD, fixed rate). */
 export function formatPrice(amountRub: number): string {
-  return rub.format(amountRub);
+  return formatMoney(amountRub, DEFAULT_CURRENCY);
 }
 
 export function formatNumber(n: number): string {

@@ -5,6 +5,7 @@ import { useMeasuredBenchmarks } from "@/features/benchmarks/measured-store";
 import { useSavedBuilds } from "@/features/build-state/saved-builds";
 import { useBuildStore } from "@/features/build-state/store";
 import { useCurrencyStore } from "@/features/settings/currency";
+import { AuthModal } from "@/components/auth/AuthModal";
 import { TopNav } from "./TopNav";
 
 /** Persisted stores skip SSR hydration; restore them once on the client to avoid markup mismatch. */
@@ -29,6 +30,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <main id="main" className="flex min-h-0 flex-1 flex-col">
         {children}
       </main>
+      <AuthModal />
     </div>
   );
 }

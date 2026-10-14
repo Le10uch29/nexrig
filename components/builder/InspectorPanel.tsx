@@ -10,7 +10,9 @@ import { ColorSwatches } from "@/components/hardware/ColorSwatches";
 import { ComponentThumb } from "@/components/hardware/ComponentThumb";
 import { colorVariantsOf } from "@/lib/hardware/variants";
 import { PerformancePanel } from "@/components/benchmarks/PerformancePanel";
+import { BalancePanel } from "@/components/compatibility/BalancePanel";
 import { CompatibilityReportView } from "@/components/compatibility/CompatibilityReport";
+import { analyzeBalance } from "@/features/compatibility/balance";
 import { UpgradeList } from "@/components/ai/UpgradeList";
 import { HScroll } from "@/components/ui/HScroll";
 import { Button, cx, EmptyState } from "@/components/ui/primitives";
@@ -87,7 +89,7 @@ export function InspectorPanel() {
   const setInspector = useBuildStore((s) => s.setInspector);
   const selection = useBuildStore((s) => s.selection);
   const perf = useBuildStore((s) => s.perf);
-  const { report } = useBuildDerived();
+  const { report, resolved } = useBuildDerived();
   const nav = useInspectorNav();
   const current = nav.find((n) => n.id === inspector);
 
@@ -119,7 +121,12 @@ export function InspectorPanel() {
       ) : (
         <div className="scroll-thin min-h-0 flex-1 overflow-y-auto p-3">
           {inspector === "build" && <BuildDetails />}
-          {inspector === "compat" && <CompatibilityReportView report={report} />}
+          {inspector === "compat" && (
+            <div className="space-y-4">
+              <CompatibilityReportView report={report} />
+              <BalancePanel report={analyzeBalance(resolved, perf.settings)} />
+            </div>
+          )}
           {inspector === "perf" && <PerformancePanel />}
           {inspector === "upgrade" && (
             <div className="space-y-3">
