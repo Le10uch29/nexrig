@@ -100,6 +100,10 @@ export interface DataSourceInfo {
   attribution: string;
   updateMode: "manual" | "scheduled" | "none";
   description: string;
+  /** How data gets in, as shown to users (e.g. "ручной импорт"). */
+  integrationLabel?: string;
+  /** Verified records from this source used in calculations. */
+  usableRecords?: number | null;
 }
 
 /** Reliability level shown to the user. */

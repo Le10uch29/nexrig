@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { badRequest, importSchema } from "@/lib/fps-engine/api-schemas";
 import { SOURCE_IDS } from "@/lib/fps-engine/sources";
+import { disabledSourceIds } from "@/lib/fps-engine/source-registry";
 import { getBenchmarkStore, storeErrorResponse } from "@/lib/fps-engine/store";
 import { IMPORT_LIMITS, parseCsv, previewImport } from "@/lib/fps-engine/validation";
 import { readLimitedText, requireAdmin } from "@/lib/server/admin-auth";
@@ -38,9 +39,11 @@ export async function POST(request: Request) {
 
   try {
     const store = getBenchmarkStore();
+    const disabled = await disabledSourceIds(store);
+    if (disabled.has(sourceId)) return Response.json({ error: `Источник «${sourceId}» отключён — включите его в разделе «Источники».` }, { status: 422 });
     let preview;
     try {
-      preview = previewImport({ format, content }, await store.similar(pairsOf(format, content)), SOURCE_IDS, () => randomUUID());
+      preview = previewImport({ format, content }, await store.similar(pairsOf(format, content)), new Set([...SOURCE_IDS].filter((id) => !disabled.has(id))), () => randomUUID());
     } catch (e) {
       if (e instanceof Error && "status" in e) throw e;
       return Response.json({ error: e instanceof Error ? e.message : "Не удалось разобрать файл." }, { status: 422 });

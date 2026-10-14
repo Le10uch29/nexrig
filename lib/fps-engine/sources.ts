@@ -1,6 +1,7 @@
 import { hardwareRepository } from "@/lib/hardware/repository";
 import type { BenchmarkRecord, DataSourceInfo } from "@/types/benchmark";
 import type { CpuSpec, GpuSpec } from "@/types/hardware";
+import { IMPORTABLE_SOURCE_IDS } from "./catalog";
 import { importRowSchema, type ImportRow } from "./validation";
 
 /**
@@ -91,8 +92,8 @@ export function activeSources(store: Parameters<typeof nexrigSource>[0]): FpsDat
   return [nexrigSource(store), MANUFACTURER];
 }
 
-/** Source ids accepted in imports. Personal measurements stay in the browser and are not importable. */
-export const SOURCE_IDS = new Set(["nexrig", "manufacturer"]);
+/** Source ids accepted in imports: the audited catalogue (see catalog.ts), except non-FPS sources. */
+export const SOURCE_IDS = IMPORTABLE_SOURCE_IDS;
 
 /** The estimation model, listed for transparency; it never produces records. */
 export const MODEL_SOURCE: DataSourceInfo = {

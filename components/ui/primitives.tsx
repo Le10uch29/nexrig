@@ -217,7 +217,7 @@ export function SectionTitle({ children, aside }: { children: ReactNode; aside?:
 }
 
 /** Accessible modal built on <dialog>: focus trap, Escape to close, backdrop click to close. */
-export function Dialog({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
+export function Dialog({ open, onClose, title, children, className }: { open: boolean; onClose: () => void; title: string; children: ReactNode; className?: string }) {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const d = ref.current;
@@ -231,7 +231,7 @@ export function Dialog({ open, onClose, title, children }: { open: boolean; onCl
       onClose={onClose}
       onClick={(e) => e.target === ref.current && onClose()}
       aria-label={title}
-      className="m-auto w-[min(520px,calc(100vw-32px))] rounded-[var(--radius-lg)] border border-line-strong bg-panel p-0 text-fg shadow-pop backdrop:bg-black/60 backdrop:backdrop-blur-[2px]"
+      className={cx("m-auto rounded-[var(--radius-lg)] border border-line-strong bg-panel p-0 text-fg shadow-pop backdrop:bg-black/60 backdrop:backdrop-blur-[2px]", className ?? "w-[min(520px,calc(100vw-32px))]")}
     >
       {open && (
         <div className="animate-in p-5">

@@ -9,7 +9,10 @@ export async function GET(request: Request) {
   const { page, pageSize, gameId, cpuId, gpuId, resolution, sourceId } = parsed.data;
   try {
     // The verification filter is fixed server-side; clients cannot request unverified data here.
-    const result = await getBenchmarkStore().list({ gameId, cpuId, gpuId, resolution, sourceId, verification: "verified" }, page, pageSize);
+    const store = getBenchmarkStore();
+    // Records of sources switched off by an admin are not offered for calculations.
+    const excludeSources = (await store.sourceStates()).filter((s) => s.status === "disabled").map((s) => s.id);
+    const result = await store.list({ gameId, cpuId, gpuId, resolution, sourceId, excludeSources, verification: "verified" }, page, pageSize);
     // Authors of community measurements are not disclosed publicly.
     return Response.json({ ...result, items: result.items.map(({ submittedBy, ...r }) => ({ ...r, community: Boolean(submittedBy) })) });
   } catch (e) {

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { badRequest, listQuerySchema, patchSchema } from "@/lib/fps-engine/api-schemas";
 import { SOURCE_IDS } from "@/lib/fps-engine/sources";
+import { disabledSourceIds } from "@/lib/fps-engine/source-registry";
 import { getBenchmarkStore, storeErrorResponse } from "@/lib/fps-engine/store";
 import { previewImport } from "@/lib/fps-engine/validation";
 import { readLimitedText, requireAdmin } from "@/lib/server/admin-auth";
@@ -36,7 +37,8 @@ export async function POST(request: Request) {
     const store = getBenchmarkStore();
     const r = row as { game_id?: unknown; gpu_id?: unknown };
     const existing = typeof r.game_id === "string" && typeof r.gpu_id === "string" ? await store.similar([{ gameId: r.game_id, gpuId: r.gpu_id }]) : [];
-    const preview = previewImport({ format: "json", content: JSON.stringify([row]) }, existing, SOURCE_IDS, () => randomUUID());
+    const disabled = await disabledSourceIds(store);
+    const preview = previewImport({ format: "json", content: JSON.stringify([row]) }, existing, new Set([...SOURCE_IDS].filter((id) => !disabled.has(id))), () => randomUUID());
     if (preview.errors.length || preview.duplicates.length) {
       return Response.json({ error: "Запись не прошла проверку.", errors: preview.errors, duplicates: preview.duplicates }, { status: 422 });
     }

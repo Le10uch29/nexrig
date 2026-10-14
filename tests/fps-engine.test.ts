@@ -101,7 +101,8 @@ describe("FPS calculation engine", () => {
 
 describe("data sources", () => {
   it("lists and accepts only sources that actually work", async () => {
-    expect([...SOURCE_IDS].sort()).toEqual(["manufacturer", "nexrig"]);
+    expect(SOURCE_IDS.has("nexrig")).toBe(true);
+    expect(SOURCE_IDS.has("3dmark")).toBe(false);
     const store = { kind: "file" as const, ping: async () => undefined, query: async () => [] };
     const sources = activeSources(store);
     expect(sources.map((s) => s.info.id)).toEqual(["nexrig", "manufacturer"]);

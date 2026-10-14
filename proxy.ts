@@ -9,6 +9,16 @@ import { authConfigured, SUPABASE_PUBLISHABLE_KEY, SUPABASE_URL } from "@/lib/su
  * authorization is checked where the data is (API routes, RLS).
  */
 export async function proxy(request: NextRequest) {
+  // Supabase falls back to the Site URL root when a redirect URL is not allow-listed:
+  // send such links (/?code=…) to the callback that turns the code into a session.
+  const code = request.nextUrl.searchParams.get("code");
+  if (request.nextUrl.pathname === "/" && code) {
+    const target = new URL("/auth/callback", request.url);
+    target.searchParams.set("code", code);
+    target.searchParams.set("next", "/builder");
+    return NextResponse.redirect(target);
+  }
+
   let response = NextResponse.next({ request });
   if (!authConfigured) return response;
 

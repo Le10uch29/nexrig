@@ -8,6 +8,7 @@ import { useMessages } from "@/lib/i18n";
 import type { ComponentCategory } from "@/types/hardware";
 import { IconAlert, IconExplode, IconLayers, IconReset, IconSkip, IconTag, IconX } from "@/components/ui/icons";
 import { Button, cx, IconButton, Segmented } from "@/components/ui/primitives";
+import { TestPcButton } from "@/components/fps-analysis/TestPcButton";
 import { SceneLabels } from "./SceneLabels";
 
 const PcScene = dynamic(() => import("./PcScene"), { ssr: false, loading: () => <SceneLoading /> });
@@ -121,6 +122,7 @@ export function SceneViewport() {
       {webgl === "ok" && <SceneLabels />}
       <SceneToolbar />
       <ProgressCard />
+      <TestPcButton />
       <MotionBanner />
       <ActivityPanel />
       <p className="pointer-events-none absolute right-3 bottom-3 hidden max-w-[300px] text-right text-[10.5px] leading-snug text-fg-3 md:block">

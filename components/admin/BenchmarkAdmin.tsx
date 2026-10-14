@@ -3,16 +3,18 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { GAMES } from "@/data/games";
 import { useAuth, useAuthDialog } from "@/features/auth/use-auth";
+import { IMPORTABLE_SOURCE_IDS } from "@/lib/fps-engine/catalog";
 import { hardwareRepository } from "@/lib/hardware/repository";
 import type { BenchmarkRecord, VerificationStatus } from "@/types/benchmark";
 import { Badge, Button, cx, EmptyState, Field, inputCls, SectionTitle, Select } from "@/components/ui/primitives";
+import { SourcesSection } from "./SourcesAdmin";
 
 /**
  * Admin console for global benchmark data. Every request carries the admin token; the server
  * checks it (lib/server/admin-auth.ts). The token is kept in sessionStorage only for this tab.
  */
 const TOKEN_KEY = "nexrig.admin-token";
-const SOURCES = ["nexrig", "manufacturer"];
+const SOURCES = [...IMPORTABLE_SOURCE_IDS];
 const VERIFICATION_LABEL: Record<VerificationStatus, string> = { unverified: "не проверено", verified: "проверено", rejected: "отклонено" };
 const VERIFICATION_TONE: Record<VerificationStatus, "neutral" | "cyan" | "warn"> = { unverified: "neutral", verified: "cyan", rejected: "warn" };
 
@@ -151,6 +153,7 @@ export function BenchmarkAdmin() {
           {authError}
         </p>
       )}
+      <SourcesSection api={api} />
       <RecordsSection api={api} />
       <ImportSection api={api} />
       <AddSection api={api} />

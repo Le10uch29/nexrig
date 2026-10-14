@@ -3,7 +3,8 @@ import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { GAMES } from "@/data/games";
 import { hardwareRepository } from "@/lib/hardware/repository";
-import type { BenchmarkRecord, Resolution, VerificationStatus } from "@/types/benchmark";
+import type { BenchmarkRecord, DataSourceInfo, Resolution, VerificationStatus } from "@/types/benchmark";
+import { catalogEntry } from "./catalog";
 import { dedupeKey } from "./validation";
 
 /**
@@ -35,6 +36,8 @@ export interface BenchmarkFilter {
   gpuId?: string;
   resolution?: Resolution;
   sourceId?: string;
+  /** Leave out records of these sources (switched off by an admin). */
+  excludeSources?: string[];
   verification?: VerificationStatus | "any";
 }
 
@@ -53,6 +56,9 @@ export interface RecordPatch {
   gameVersion?: string;
   verification?: VerificationStatus;
 }
+
+/** Stored state of a data source (data_sources table). */
+export type SourceState = Omit<DataSourceInfo, "description"> & { notes?: string | null };
 
 export interface BenchmarkStore {
   kind: "supabase" | "file";
@@ -74,6 +80,10 @@ export interface BenchmarkStore {
   rollback(batchId: string): Promise<{ removed: number; kept: number } | null>;
   /** A user's own measurement (no import batch). Returns false if the same test already exists. */
   insertSubmission(record: BenchmarkRecord): Promise<boolean>;
+  /** Stored source states (enable/disable, URL, last check). */
+  sourceStates(): Promise<SourceState[]>;
+  /** Inserts or updates one source state. */
+  saveSourceState(state: SourceState): Promise<void>;
 }
 
 export class StoreError extends Error {
@@ -91,7 +101,9 @@ export class StoreError extends Error {
  */
 export async function recordsForCalculation(filter: BenchmarkFilter): Promise<{ records: BenchmarkRecord[]; warning: string | null }> {
   try {
-    return { records: await getBenchmarkStore().query({ ...filter, verification: "verified" }), warning: null };
+    const store = getBenchmarkStore();
+    const disabled = (await store.sourceStates()).filter((s) => s.status === "disabled").map((s) => s.id);
+    return { records: await store.query({ ...filter, excludeSources: disabled, verification: "verified" }), warning: null };
   } catch (e) {
     const reason = e instanceof StoreError ? e.message : "Хранилище замеров недоступно.";
     return { records: [], warning: `База проверенных замеров недоступна (${reason}) — результат рассчитан без неё.` };
@@ -111,6 +123,7 @@ const matches = (r: BenchmarkRecord, f: BenchmarkFilter) =>
   (!f.gpuId || r.gpuId === f.gpuId) &&
   (!f.resolution || r.settings.resolution === f.resolution) &&
   (!f.sourceId || r.sourceId === f.sourceId) &&
+  (!f.excludeSources?.length || !r.sourceId || !f.excludeSources.includes(r.sourceId)) &&
   (!f.verification || f.verification === "any" || (r.verification ?? "unverified") === f.verification);
 
 /** A record counts as "modified after import" when its last change is later than the import. */
@@ -125,6 +138,7 @@ type StoredRecord = BenchmarkRecord & { updatedAt?: string };
 interface StoreData {
   records: StoredRecord[];
   batches: ImportBatch[];
+  sources?: SourceState[];
 }
 
 export function createFileStore(file: string): BenchmarkStore {
@@ -135,7 +149,7 @@ export function createFileStore(file: string): BenchmarkStore {
     if (cache) return cache;
     try {
       const parsed = JSON.parse(await readFile(/*turbopackIgnore: true*/ file, "utf8")) as Partial<StoreData>;
-      cache = { records: parsed.records ?? [], batches: parsed.batches ?? [] };
+      cache = { records: parsed.records ?? [], batches: parsed.batches ?? [], sources: parsed.sources ?? [] };
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw new StoreError("Хранилище замеров повреждено или недоступно для чтения.");
       cache = { records: [], batches: [] };
@@ -232,6 +246,14 @@ export function createFileStore(file: string): BenchmarkStore {
         const now = new Date().toISOString();
         d.records.push({ ...record, createdAt: now, updatedAt: now });
         return true;
+      });
+    },
+    async sourceStates() {
+      return (await load()).sources ?? [];
+    },
+    saveSourceState(state) {
+      return mutate((d) => {
+        d.sources = [...(d.sources ?? []).filter((x) => x.id !== state.id), state];
       });
     },
     rollback(batchId) {
@@ -344,6 +366,8 @@ function filterQuery(f: BenchmarkFilter) {
   if (f.gpuId) q.push(`gpu_id=eq.${enc(f.gpuId)}`);
   if (f.resolution) q.push(`resolution=eq.${enc(f.resolution)}`);
   if (f.sourceId) q.push(`source_id=eq.${enc(f.sourceId)}`);
+  // NULL source ids are kept (NOT IN alone would drop them).
+  if (f.excludeSources?.length) q.push(`or=(source_id.is.null,source_id.not.in.(${f.excludeSources.map((s) => enc(s.replace(/[^a-z0-9_-]/gi, ""))).join(",")}))`);
   if (f.verification && f.verification !== "any") q.push(`verification_status=eq.${enc(f.verification)}`);
   return q.join("&");
 }
@@ -389,7 +413,13 @@ export function createSupabaseStore(baseUrl: string, secretKey: string): Benchma
   }
 
   /** Catalogue ids are text slugs from the app; make sure referenced rows exist (FK targets). */
-  async function ensureReferences(records: BenchmarkRecord[]) {
+  async function ensureReferences(records: BenchmarkRecord[], extraSourceIds: string[] = []) {
+    // Sources from the audited catalogue are created on first use (existing rows are left as they are).
+    const sources = [...new Set([...records.map((r) => r.sourceId ?? "nexrig"), ...extraSourceIds])].flatMap((id) => {
+      const s = catalogEntry(id);
+      return s ? [{ id: s.id, name: s.name, base_url: s.baseUrl, integration: s.integration, status: id === "nexrig" || id === "manufacturer" ? "active" : "not_configured", attribution: s.attribution, update_mode: "manual" }] : [];
+    });
+    if (sources.length) await call("data_sources?on_conflict=id", { method: "POST", body: JSON.stringify(sources), prefer: "resolution=ignore-duplicates,return=minimal" });
     const gameIds = [...new Set(records.map((r) => r.gameId))];
     const games = gameIds.flatMap((id) => {
       const g = GAMES.find((x) => x.id === id);
@@ -440,7 +470,7 @@ export function createSupabaseStore(baseUrl: string, secretKey: string): Benchma
       return rows[0] ? fromRow(rows[0]) : null;
     },
     async insertBatch(records, batch) {
-      await ensureReferences(records);
+      await ensureReferences(records, [batch.sourceId]);
       // Skip rows already present (the unique index would reject them anyway).
       const existing = new Set((await this.similar(records.map((r) => ({ gameId: r.gameId, gpuId: r.gpuId })))).map(dedupeKey));
       const seen = new Set<string>();
@@ -512,6 +542,38 @@ export function createSupabaseStore(baseUrl: string, secretKey: string): Benchma
         throw e;
       }
     },
+    async sourceStates() {
+      const rows = await json<Row[]>(await call("data_sources?select=*&order=id.asc"));
+      return rows.map((x) => ({
+        id: String(x.id),
+        name: String(x.name),
+        baseUrl: str(x.base_url) ?? null,
+        integration: x.integration as SourceState["integration"],
+        status: x.status as SourceState["status"],
+        lastSyncAt: str(x.last_sync_at) ?? null,
+        lastErrorAt: str(x.last_error_at) ?? null,
+        errorMessage: str(x.error_message) ?? null,
+        attribution: str(x.attribution) ?? "",
+        updateMode: (x.update_mode as SourceState["updateMode"]) ?? "manual",
+        notes: str(x.notes) ?? null,
+      }));
+    },
+    async saveSourceState(s) {
+      const row = {
+        id: s.id,
+        name: s.name,
+        base_url: s.baseUrl,
+        integration: s.integration,
+        status: s.status,
+        last_sync_at: s.lastSyncAt,
+        last_error_at: s.lastErrorAt,
+        error_message: s.errorMessage?.slice(0, 500) ?? null,
+        attribution: s.attribution,
+        update_mode: s.updateMode,
+        notes: s.notes ?? null,
+      };
+      await call("data_sources?on_conflict=id", { method: "POST", body: JSON.stringify(row), prefer: "resolution=merge-duplicates,return=minimal" });
+    },
     async rollback(batchId) {
       if (!/^[0-9a-f-]{36}$/i.test(batchId)) return null;
       const batches = await json<Row[]>(await call(`benchmark_import_batches?select=status&id=eq.${batchId}`));
@@ -580,6 +642,8 @@ export function createUnconfiguredStore(reason: string): BenchmarkStore {
     remove: fail,
     batches: fail,
     rollback: fail,
+    sourceStates: fail,
+    saveSourceState: fail,
   };
 }
 
