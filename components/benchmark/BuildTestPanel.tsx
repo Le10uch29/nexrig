@@ -6,8 +6,19 @@ import { useBuildStore } from "@/features/build-state/store";
 import { freezeBuild, missingForTest } from "@/features/fps-analysis/freeze";
 import { useAnalysis } from "@/features/fps-analysis/store";
 import { settingsLabel } from "@/lib/fps-engine/analysis";
+import { ANALYSIS_STAGES } from "@/lib/fps-engine/analysis-stages";
+import type { ComponentCategory } from "@/types/hardware";
 import { AnalysisDialog } from "@/components/fps-analysis/AnalysisDialog";
-import { Button } from "@/components/ui/primitives";
+import { ComponentThumb } from "@/components/hardware/ComponentThumb";
+import { IconGauge } from "@/components/ui/icons";
+import { Button, cx } from "@/components/ui/primitives";
+import { Surface } from "@/components/ui/studio";
+
+const PROVENANCE: [string, string, string][] = [
+  ["bg-cyan", "Измерено", "проверенный тест этой же конфигурации"],
+  ["bg-violet", "Перенос", "тест похожей системы, пересчитанный на вашу"],
+  ["bg-fg-2", "Модель", "расчёт без тестов, с широким диапазоном"],
+];
 
 /** NexRig Benchmark, mode A: the build from the 3D configurator, analysed on the server. */
 export function BuildTestPanel() {
@@ -28,40 +39,71 @@ export function BuildTestPanel() {
     void start(frozen);
   };
 
-  const parts: [string, string][] = [
-    ["Процессор", resolved.cpu?.name ?? "не выбран"],
-    ["Видеокарта", resolved.gpu?.name ?? "не выбрана"],
-    ["Память", resolved.ram ? `${resolved.ramCount} × ${resolved.ram.moduleSizeGb} ГБ ${resolved.ram.type} ${resolved.ram.speedMtps} МТ/с` : "не выбрана"],
-    ["Настройки", settingsLabel({ ...settings, resolution: undefined })],
+  const parts: { category: ComponentCategory; label: string; value: string; component?: Parameters<typeof ComponentThumb>[0]["component"] }[] = [
+    { category: "cpu", label: "Процессор", value: resolved.cpu?.name ?? "не выбран", component: resolved.cpu },
+    { category: "gpu", label: "Видеокарта", value: resolved.gpu?.name ?? "не выбрана", component: resolved.gpu },
+    { category: "ram", label: "Память", value: resolved.ram ? `${resolved.ramCount} × ${resolved.ram.moduleSizeGb} ГБ ${resolved.ram.type} ${resolved.ram.speedMtps} МТ/с` : "не выбрана", component: resolved.ram },
   ];
 
   return (
-    <section className="space-y-3 rounded-[var(--radius-lg)] border border-line bg-panel p-4">
-      <div>
-        <h2 className="text-sm font-semibold">{buildName}</h2>
-        <p className="text-[11.5px] text-fg-3">Сборка из 3D-конфигуратора. Настройки графики меняются в разделе «FPS и производительность» конструктора.</p>
-      </div>
-      <dl className="grid gap-x-4 gap-y-1 text-[12px] sm:grid-cols-2">
-        {parts.map(([k, v]) => (
-          <div key={k} className="flex gap-2">
-            <dt className="shrink-0 text-fg-3">{k}:</dt>
-            <dd>{v}</dd>
-          </div>
-        ))}
-      </dl>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button variant="primary" onClick={onClick} disabled={missing.length > 0}>
-          {running ? "Идёт анализ… (открыть)" : "Протестировать сборку"}
-        </Button>
-        <Link href="/builder" className="inline-flex h-9 items-center rounded-[var(--radius-md)] px-3 text-sm text-fg-2 hover:bg-panel-2 hover:text-fg">
-          Изменить сборку
-        </Link>
-        {missing.length > 0 && <p className="text-[12px] text-fg-3">Добавьте {missing.join(" и ")} в конфигураторе.</p>}
-      </div>
-      <p className="text-[11.5px] text-fg-3">
-        Анализ ищет проверенные тесты этой и похожих конфигураций в базе NexRig, переносит их на вашу сборку и показывает, где значение измерено, перенесено или рассчитано моделью. Внешние сайты при этом не опрашиваются: их результаты вносятся в базу импортом со ссылкой на источник.
-      </p>
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+      <Surface className="space-y-6 p-6 md:p-8">
+        <div>
+          <p className="eyebrow">Сборка из конфигуратора</p>
+          <h2 className="mt-1 text-[26px] leading-tight font-semibold tracking-tight">{buildName}</h2>
+          <p className="mt-1 text-[14px] text-fg-3">Настройки графики: {settingsLabel({ ...settings, resolution: undefined })}</p>
+        </div>
+        <ul className="space-y-3">
+          {parts.map((p) => (
+            <li key={p.category} className="flex items-center gap-4">
+              <ComponentThumb component={p.component} category={p.category} size={56} />
+              <div className="min-w-0">
+                <p className="text-[12.5px] text-fg-3">{p.label}</p>
+                <p className={cx("truncate text-[16px] font-medium", !p.component && "text-fg-3 italic")}>{p.value}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+        <div className="flex flex-wrap items-center gap-3 border-t border-line pt-6">
+          <Button variant="primary" className="h-12 px-6 text-[15px]" onClick={onClick} disabled={missing.length > 0}>
+            <IconGauge width={18} height={18} />
+            {running ? "Идёт анализ… (открыть)" : "Протестировать сборку"}
+          </Button>
+          <Link href="/builder" className="inline-flex h-12 items-center rounded-[var(--radius-md)] px-4 text-[14px] text-fg-2 hover:bg-[var(--hover-bg)] hover:text-fg">
+            Изменить сборку
+          </Link>
+          {missing.length > 0 && <p className="text-[13px] text-warn">Добавьте {missing.join(" и ")} в конфигураторе.</p>}
+        </div>
+      </Surface>
+
+      <Surface as="aside" className="space-y-6 p-6 md:p-8">
+        <div>
+          <p className="eyebrow">Как работает анализ</p>
+          <ol className="mt-3 space-y-2.5">
+            {ANALYSIS_STAGES.map((s, i) => (
+              <li key={s.id} className="flex items-center gap-3 text-[14px] text-fg-2">
+                <span className="num grid size-6 shrink-0 place-items-center rounded-full bg-panel-3 text-[11px] text-fg-3">{i + 1}</span>
+                {s.label}
+              </li>
+            ))}
+          </ol>
+        </div>
+        <div className="border-t border-line pt-5">
+          <p className="eyebrow">Откуда каждое значение</p>
+          <ul className="mt-3 space-y-2">
+            {PROVENANCE.map(([dot, label, text]) => (
+              <li key={label} className="flex items-start gap-2.5 text-[13.5px]">
+                <span className={cx("mt-1.5 size-2 shrink-0 rounded-full", dot)} aria-hidden />
+                <span>
+                  <span className="font-medium">{label}</span> <span className="text-fg-3">— {text}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 text-[12.5px] leading-relaxed text-fg-3">Внешние сайты при запуске не опрашиваются: их результаты вносятся в базу импортом со ссылкой на источник.</p>
+        </div>
+      </Surface>
       <AnalysisDialog />
-    </section>
+    </div>
   );
 }

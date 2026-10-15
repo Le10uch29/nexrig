@@ -15,14 +15,14 @@ import { GlobalSearch } from "./GlobalSearch";
 
 export function Logo() {
   return (
-    <Link href="/builder" className="flex items-center gap-2.5 rounded-md pr-1" aria-label="BuildAI — к сборке">
+    <Link href="/builder" className="flex items-center gap-2.5 rounded-md pr-1" aria-label="NexRig — к сборке">
       <svg width="26" height="26" viewBox="0 0 32 32" aria-hidden>
         <rect x="1" y="1" width="30" height="30" rx="8" fill="#141927" stroke="#313a51" />
-        <path d="M9 22V10h7.2c2.6 0 4.1 1.3 4.1 3.2 0 1.3-.7 2.3-1.9 2.7 1.5.4 2.4 1.5 2.4 3 0 2.1-1.6 3.1-4.3 3.1H9Z" fill="none" stroke="#8d7dff" strokeWidth="2" strokeLinejoin="round" />
+        <path d="M10 22V10l12 12V10" fill="none" stroke="#8d7dff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
         <circle cx="23.5" cy="9" r="1.8" fill="#4fd1e3" />
       </svg>
       <span className="text-[15px] font-bold tracking-tight">
-        Build<span className="text-violet">AI</span>
+        Nex<span className="text-violet">Rig</span>
       </span>
     </Link>
   );
@@ -34,10 +34,11 @@ export function TopNav() {
   const [menuOpen, setMenuOpen] = useState(false);
   const links = [
     { href: "/builder", label: t.nav.builder, icon: IconCube },
+    { href: "/database", label: t.nav.database, icon: IconDatabase },
     { href: "/games", label: t.nav.games, icon: IconGauge },
     { href: "/benchmark", label: t.nav.benchmark, icon: IconBolt },
+    { href: "/community", label: t.nav.community, icon: IconUser },
     { href: "/upgrade", label: t.nav.upgrade, icon: IconArrowUp },
-    { href: "/database", label: t.nav.database, icon: IconDatabase },
   ];
 
   return (
@@ -54,8 +55,9 @@ export function TopNav() {
                 href={l.href}
                 aria-current={active ? "page" : undefined}
                 className={cx(
-                  "flex h-8 items-center gap-2 rounded-[var(--radius-sm)] px-2 text-[13px] font-medium whitespace-nowrap transition-colors xl:px-2.5",
-                  active ? "bg-panel-2 text-fg shadow-[0_0_0_1px_var(--line)]" : "text-fg-3 hover:text-fg",
+                  "relative flex h-8 items-center gap-2 rounded-[var(--radius-sm)] px-2 text-[13px] font-medium whitespace-nowrap transition-colors xl:px-2.5",
+                  // Active: text + a violet underline flush with the header edge — clear, but quieter than a filled tab.
+                  active ? "text-fg after:absolute after:inset-x-2 after:-bottom-[12px] after:h-0.5 after:rounded-full after:bg-violet" : "text-fg-3 hover:bg-[var(--hover-bg)] hover:text-fg",
                 )}
               >
                 <l.icon className={cx("hidden xl:block", active && "text-violet")} />
@@ -89,7 +91,7 @@ export function TopNav() {
               aria-current={pathname.startsWith(l.href) ? "page" : undefined}
               className={cx(
                 "flex h-10 items-center gap-2.5 rounded-[var(--radius-sm)] px-3 text-sm",
-                pathname.startsWith(l.href) ? "bg-panel-2 text-fg" : "text-fg-2",
+                pathname.startsWith(l.href) ? "bg-[var(--selected-bg)] text-fg" : "text-fg-2 hover:bg-[var(--hover-bg)]",
               )}
             >
               <l.icon /> {l.label}

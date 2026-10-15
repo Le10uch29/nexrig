@@ -22,14 +22,17 @@ import type { CpuSpec, GpuSpec } from "@/types/hardware";
 import { ConflictDialog } from "@/components/builder/ConflictDialog";
 import { Badge, Button, cx, EmptyState, Field, SectionTitle, Select } from "@/components/ui/primitives";
 import { FpsBars } from "./FpsBars";
-import { FpsResult, KIND_LABEL, KIND_TONE, TargetBadge } from "./FpsResult";
+import { KIND_LABEL, KIND_TONE, TargetBadge } from "./FpsResult";
 import { MeasuredRecords } from "./MeasuredRecords";
 import { PerformanceControls } from "./PerformanceControls";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { PageShell, Surface } from "@/components/ui/studio";
+import { FpsKpiBand } from "./FpsKpiBand";
 import { useSourceStatuses, useVerifiedRecords } from "./useServerData";
 
 const RESOLUTIONS: Resolution[] = ["1080p", "1440p", "4K"];
 const PRESETS: GraphicsPreset[] = ["low", "medium", "high", "ultra"];
-const LEVEL_TONE: Record<FpsConfidenceLevel, "cyan" | "violet" | "neutral" | "warn"> = { verified: "cyan", close: "violet", model: "neutral", insufficient: "warn" };
+const LEVEL_TONE: Record<FpsConfidenceLevel, "cyan" | "violet" | "neutral" | "warn"> = { verified: "cyan", close: "violet", model: "neutral", insufficient: "neutral" };
 const SOURCE_STATUS_LABEL = { active: "активен", not_configured: "не подключён", disabled: "отключён", error: "ошибка" } as const;
 
 interface Rig {
@@ -52,7 +55,7 @@ function useChipOptions() {
 }
 
 function Panel({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <section className={cx("rounded-[var(--radius-lg)] border border-line bg-panel p-4", className)}>{children}</section>;
+  return <section className={cx("rounded-[var(--radius-xl)] bg-panel p-5 ring-1 ring-white/[0.06]", className)}>{children}</section>;
 }
 
 function deltaText(a: PerformanceResult, b: PerformanceResult) {
@@ -139,72 +142,69 @@ export function FpsLab() {
           : "CPU и видеокарта загружены сбалансированно — прирост потребует апгрейда обоих или снижения настроек."
       : null;
 
+  const rig: [string, string | undefined][] = [
+    ["Процессор", resolved.cpu?.name],
+    ["Видеокарта", resolved.gpu?.name],
+    ["Память", resolved.ram ? `${resolved.ramCount} × ${resolved.ram.moduleSizeGb} ГБ ${resolved.ram.type}-${resolved.ram.speedMtps}` : undefined],
+  ];
   return (
-    <div className="mx-auto w-full max-w-[1320px] space-y-5 px-4 py-6 md:px-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">FPS Lab</h1>
-          <p className="max-w-3xl text-sm text-fg-3">Ожидаемая производительность вашей сборки с учётом CPU, видеокарты, памяти, разрешения и технологий, которые реально поддерживают игра и железо.</p>
-        </div>
-        <div className="flex flex-wrap gap-2 text-[11px]" aria-label="Типы данных">
-          {(Object.keys(KIND_LABEL) as (keyof typeof KIND_LABEL)[]).map((k) => (
-            <Badge key={k} tone={KIND_TONE[k]}>
-              {KIND_LABEL[k]}
-            </Badge>
-          ))}
-        </div>
-      </header>
-
-      <Link href="/benchmark" className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-lg)] border border-violet/30 bg-violet-soft/30 px-4 py-3 text-[12.5px] hover:border-violet/50">
-        <span>
-          <span className="font-semibold">NexRig Benchmark</span>
-          <span className="text-fg-2"> — «Протестировать сборку»: анализ всех игр и разрешений с источниками; «Проверить этот компьютер»: реальный замер WebGPU/WebGL2 в браузере.</span>
-        </span>
-        <span className="text-violet">Открыть →</span>
-      </Link>
-
-      <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
-        <Panel>
-          <SectionTitle aside={<Link href="/builder" className="text-[11px] text-violet hover:underline">Изменить</Link>}>Конфигурация</SectionTitle>
-          <dl className="mt-3 space-y-2 text-[12.5px]">
-            {[
-              ["CPU", resolved.cpu?.name],
-              ["GPU", resolved.gpu?.name],
-              ["Память", resolved.ram ? `${resolved.ramCount} × ${resolved.ram.moduleSizeGb} ГБ ${resolved.ram.type}-${resolved.ram.speedMtps}` : undefined],
-              ["Каналы", resolved.ram ? (resolved.ramCount === 1 ? "одноканальный" : resolved.ramCount === 3 ? "несимметричный" : "двухканальный") : undefined],
-            ].map(([k, v]) => (
-              <div key={k} className="flex justify-between gap-3">
-                <dt className="text-fg-3">{k}</dt>
-                <dd className={cx("text-right", v ? "text-fg" : "text-fg-3 italic")}>{v ?? "не выбрано"}</dd>
+    <PageShell className="space-y-8">
+      <PageHeader
+        section="Производительность"
+        title="FPS Lab"
+        description="Ожидаемая производительность вашей сборки в играх: средний FPS, 1% low и узкое место — с честной пометкой, где замер, а где расчёт модели."
+        aside={
+          <Surface as="div" className="grid w-full gap-x-8 gap-y-3 p-4 sm:w-auto sm:grid-cols-[repeat(3,minmax(0,auto))_auto] sm:items-end">
+            {rig.map(([k, v]) => (
+              <div key={k} className="min-w-0">
+                <p className="eyebrow">{k}</p>
+                <p className={cx("max-w-[220px] truncate text-[14px] font-medium", !v && "text-fg-3 italic")}>{v ?? "не выбрано"}</p>
               </div>
             ))}
-          </dl>
-        </Panel>
-        <Panel>
-          <PerformanceControls
-            layout="row"
-            gameId={perf.gameId}
-            settings={settings}
-            gpu={resolved.gpu}
-            onGame={(gameId) => setPerf({ gameId })}
-            onSettings={(s) => setPerf({ settings: s })}
-            target={target}
-            onTarget={(targetFps) => setPerf({ targetFps })}
-          />
-        </Panel>
-      </div>
+            <Link href="/builder" className="text-[13px] text-violet hover:underline">
+              Изменить
+            </Link>
+          </Surface>
+        }
+      />
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <div className="space-y-3">
-          <SectionTitle>
-            {game.title} · {RESOLUTION_PIXELS[settings.resolution]}
-          </SectionTitle>
-          {fpsCaveats(report.checks).slice(0, 2).map((c) => (
-            <p key={c} role="alert" className="rounded-[var(--radius-md)] border border-bad/40 bg-bad-soft p-2.5 text-[12px] text-bad">
-              {c}
-            </p>
-          ))}
-          <FpsResult result={main} target={target} />
+      <Surface className="p-5 md:p-6" aria-label="Сценарий">
+        <PerformanceControls
+          layout="row"
+          gameId={perf.gameId}
+          settings={settings}
+          gpu={resolved.gpu}
+          onGame={(gameId) => setPerf({ gameId })}
+          onSettings={(s) => setPerf({ settings: s })}
+          target={target}
+          onTarget={(targetFps) => setPerf({ targetFps })}
+        />
+      </Surface>
+
+      {fpsCaveats(report.checks).slice(0, 2).map((c) => (
+        <p key={c} role="alert" className="rounded-[var(--radius-lg)] border border-bad/40 bg-bad-soft p-3 text-[13px] text-bad">
+          {c}
+        </p>
+      ))}
+
+      <FpsKpiBand result={main} target={target} scenario={`${game.title} · ${RESOLUTION_PIXELS[settings.resolution]} · ${t.perf.presets[settings.preset]}`} />
+
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-6 self-start md:grid-cols-2">
+          <Panel>
+            <FpsBars caption="Разрешения · средний FPS (линия — диапазон)" groups={resolutionGroups} series={[{ key: "cur", label: current.label }, ...(alt ? [{ key: "alt", label: alt.label }] : [])]} target={target} />
+          </Panel>
+          <Panel>
+            <FpsBars caption={`Пресеты · ${settings.resolution}`} groups={presetGroups} series={[{ key: "cur", label: current.label }, ...(alt ? [{ key: "alt", label: alt.label }] : [])]} target={target} />
+          </Panel>
+          {bottleneckAdvice && (
+            <Panel className="text-[14px] leading-relaxed text-fg-2 md:col-span-2">
+              <p className="eyebrow mb-1.5">Узкое место</p>
+              {bottleneckAdvice}
+            </Panel>
+          )}
+        </div>
+        <div className="space-y-6">
           <Panel className="space-y-2 text-[12px]">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-[11px] font-semibold tracking-wide text-fg-3 uppercase">Происхождение результата</p>
@@ -263,23 +263,6 @@ export function FpsLab() {
               </div>
             )}
           </Panel>
-          {bottleneckAdvice && (
-            <Panel className="text-[12.5px] leading-relaxed text-fg-2">
-              <p className="mb-1 text-[11px] font-semibold tracking-wide text-fg-3 uppercase">Узкое место</p>
-              {bottleneckAdvice}
-            </Panel>
-          )}
-          <Panel>
-            <BalancePanel report={balance} />
-          </Panel>
-        </div>
-        <div className="space-y-4">
-          <Panel>
-            <FpsBars caption="Разрешения · средний FPS (линия — диапазон)" groups={resolutionGroups} series={[{ key: "cur", label: current.label }, ...(alt ? [{ key: "alt", label: alt.label }] : [])]} target={target} />
-          </Panel>
-          <Panel>
-            <FpsBars caption={`Пресеты · ${settings.resolution}`} groups={presetGroups} series={[{ key: "cur", label: current.label }, ...(alt ? [{ key: "alt", label: alt.label }] : [])]} target={target} />
-          </Panel>
           <Panel>
             <SectionTitle>Наибольший прирост · {game.title}</SectionTitle>
             {upgrades.top.length === 0 ? (
@@ -287,7 +270,7 @@ export function FpsLab() {
             ) : (
               <ul className="mt-2 space-y-2">
                 {upgrades.top.map((o) => (
-                  <li key={o.component.id} className="flex items-center justify-between gap-3 text-[12.5px]">
+                  <li key={o.component.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 text-[12.5px]">
                     <div className="min-w-0">
                       <p className="truncate font-medium">{o.component.name}</p>
                       <p className="num text-[11px] text-fg-3">
@@ -306,6 +289,18 @@ export function FpsLab() {
           </Panel>
         </div>
       </div>
+
+      <Panel>
+        <BalancePanel report={balance} />
+      </Panel>
+
+      <Link href="/benchmark" className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-xl)] bg-violet-soft/40 px-5 py-4 text-[14px] ring-1 ring-violet/30 hover:ring-violet/50">
+        <span>
+          <span className="font-semibold">NexRig Benchmark</span>
+          <span className="text-fg-2"> — анализ всех игр и разрешений с источниками или реальный замер WebGPU/WebGL2 в вашем браузере.</span>
+        </span>
+        <span className="text-violet">Открыть →</span>
+      </Link>
 
       <section className="space-y-3">
         <SectionTitle>Все игры · {RESOLUTION_PIXELS[settings.resolution]}, {t.perf.presets[settings.preset]}</SectionTitle>
@@ -465,6 +460,6 @@ export function FpsLab() {
         </p>
       </Panel>
       <ConflictDialog />
-    </div>
+    </PageShell>
   );
 }

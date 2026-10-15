@@ -15,8 +15,9 @@ import { CompatibilityReportView } from "@/components/compatibility/Compatibilit
 import { analyzeBalance } from "@/features/compatibility/balance";
 import { UpgradeList } from "@/components/ai/UpgradeList";
 import { HScroll } from "@/components/ui/HScroll";
+import { IconChevron } from "@/components/ui/icons";
 import { Button, cx, EmptyState } from "@/components/ui/primitives";
-import { useInspectorNav } from "./BuildSidebar";
+import { useInspectorNav } from "./inspector-nav";
 import { CatalogPanel } from "./CatalogPanel";
 import { ComparePanel } from "./ComparePanel";
 import { SavedBuildsPanel } from "./SavedBuildsPanel";
@@ -87,6 +88,7 @@ function BuildDetails() {
 export function InspectorPanel() {
   const inspector = useBuildStore((s) => s.inspector);
   const setInspector = useBuildStore((s) => s.setInspector);
+  const setView = useBuildStore((s) => s.setView);
   const selection = useBuildStore((s) => s.selection);
   const perf = useBuildStore((s) => s.perf);
   const { report, resolved } = useBuildDerived();
@@ -94,28 +96,35 @@ export function InspectorPanel() {
   const current = nav.find((n) => n.id === inspector);
 
   return (
-    <section className="flex h-full min-h-0 flex-col bg-panel/60 lg:border-l lg:border-line" aria-label={current?.label}>
-      {/* Tabs for narrow layouts where the sidebar nav is not beside the scene. */}
-      <HScroll className="border-b border-line bg-panel lg:hidden" innerClassName="gap-1 p-2" role="tablist">
-        {nav.map((n) => (
-          <button
-            key={n.id}
-            role="tab"
-            aria-selected={inspector === n.id}
-            onClick={() => setInspector(n.id)}
-            className={cx(
-              "flex shrink-0 items-center gap-1.5 rounded-[var(--radius-sm)] px-2.5 py-1.5 text-xs transition-colors",
-              inspector === n.id ? "bg-panel-3 text-fg" : "text-fg-3 hover:bg-panel-2 hover:text-fg",
-            )}
-          >
-            <n.icon width={14} height={14} /> {n.label}
-          </button>
-        ))}
-      </HScroll>
-      <header className="hidden items-center gap-2 border-b border-line px-4 py-3 lg:flex">
-        {current && <current.icon className="text-violet" />}
-        <h2 className="text-[13px] font-semibold">{current?.label}</h2>
-      </header>
+    <section className="flex h-full min-h-0 flex-col bg-panel lg:border-l lg:border-line" aria-label={current?.label}>
+      {/* One tab bar for every width: sections are always one click away. */}
+      <div className="flex items-stretch border-b border-line">
+        <HScroll className="min-w-0 flex-1" innerClassName="gap-0.5 px-2" role="tablist">
+          {nav.map((n) => (
+            <button
+              key={n.id}
+              role="tab"
+              aria-selected={inspector === n.id}
+              onClick={() => setInspector(n.id)}
+              title={n.label}
+              className={cx(
+                "relative flex h-12 shrink-0 items-center gap-1.5 px-2.5 text-[13px] font-medium transition-colors",
+                inspector === n.id ? "text-fg after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-violet" : "text-fg-3 hover:text-fg",
+              )}
+            >
+              <n.icon width={15} height={15} className={inspector === n.id ? "text-violet" : undefined} />
+              {n.short}
+              {n.badge ? <span className="num rounded-full bg-warn-soft px-1.5 text-[10.5px] text-warn">{n.badge}</span> : null}
+            </button>
+          ))}
+        </HScroll>
+        <button type="button" onClick={() => setView({ rightPanel: false })} title="Свернуть панель — больше места для 3D-сцены" aria-label="Свернуть панель" className="hidden w-10 shrink-0 place-items-center border-l border-line text-fg-3 hover:bg-[var(--hover-bg)] hover:text-fg lg:grid">
+          <IconChevron />
+        </button>
+      </div>
+      {current && inspector !== "catalog" && (
+        <h2 className="px-4 pt-4 text-[17px] font-semibold tracking-tight">{current.label}</h2>
+      )}
       {inspector === "catalog" ? (
         <CatalogPanel />
       ) : (

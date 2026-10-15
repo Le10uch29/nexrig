@@ -8,6 +8,7 @@ import { hardwareRepository } from "@/lib/hardware/repository";
 import type { BenchmarkRecord, VerificationStatus } from "@/types/benchmark";
 import { Badge, Button, cx, EmptyState, Field, inputCls, SectionTitle, Select } from "@/components/ui/primitives";
 import { BrowserResultsSection } from "./BrowserResultsAdmin";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { SourcesSection } from "./SourcesAdmin";
 
 /**
@@ -130,25 +131,26 @@ export function BenchmarkAdmin() {
 
   return (
     <div className="mx-auto w-full max-w-[1320px] space-y-5 px-4 py-6 md:px-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Бенчмарки · администрирование</h1>
-          <p className="text-sm text-fg-3">Импорт, проверка и происхождение записей. В расчёты FPS попадают только записи со статусом «проверено».</p>
-        </div>
-        {sessionAdmin ? (
-          <span className="text-[12px] text-fg-3">Администратор: {auth.user?.email}</span>
-        ) : (
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setToken("");
-              setDraftToken("");
-            }}
-          >
-            Забыть токен
-          </Button>
-        )}
-      </header>
+      <PageHeader
+        section="Администрирование"
+        title="Бенчмарки"
+        description="Импорт, проверка и происхождение записей. В расчёты FPS попадают только записи со статусом «проверено»."
+        aside={
+          sessionAdmin ? (
+            <span className="text-[12px] text-fg-3">Администратор: {auth.user?.email}</span>
+          ) : (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setToken("");
+                setDraftToken("");
+              }}
+            >
+              Забыть токен
+            </Button>
+          )
+        }
+      />
       {authError && (
         <p role="alert" className="rounded-[var(--radius-md)] border border-bad/40 bg-bad-soft p-3 text-[12.5px] text-bad">
           {authError}

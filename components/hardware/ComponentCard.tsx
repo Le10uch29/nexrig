@@ -6,7 +6,7 @@ import type { CandidateVerdict } from "@/features/compatibility/engine";
 import { keySpecs } from "@/lib/hardware/specs";
 import { useMessages } from "@/lib/i18n";
 import type { HardwareComponent } from "@/types/hardware";
-import { IconChevron } from "@/components/ui/icons";
+import { IconCheck, IconChevron } from "@/components/ui/icons";
 import { Button, cx, StatusIcon, StatusPill } from "@/components/ui/primitives";
 import { ColorSwatches } from "./ColorSwatches";
 import { ComponentThumb } from "./ComponentThumb";
@@ -41,21 +41,32 @@ export function ComponentCard({
   const [open, setOpen] = useState(false);
   const specs = keySpecs(component, open);
   const issues = verdict.checks.filter((c) => c.status !== "compatible");
+  // The most important problem is visible without expanding the card.
+  const topIssue = issues.find((c) => c.status === "incompatible") ?? issues.find((c) => c.status === "warning");
   return (
     <article
       id={`card-${component.id}`}
       className={cx(
-        "rounded-[var(--radius-md)] border bg-panel-2/60 p-3 transition-colors",
-        installed ? "border-ok/35" : focused ? "border-violet/60 shadow-[0_0_0_3px_var(--violet-soft)]" : "border-line hover:border-line-strong",
+        "rounded-[var(--radius-md)] border p-3 transition-[border-color,background-color,box-shadow] duration-150",
+        installed
+          ? "border-[var(--selected-border)] bg-[var(--selected-bg)]"
+          : focused
+            ? "border-violet/60 bg-panel-2/60 shadow-[0_0_0_3px_var(--violet-soft)]"
+            : "border-line bg-panel-2/60 hover:border-line-strong hover:bg-panel-2",
       )}
     >
       <div className="flex gap-3">
-        <ComponentThumb component={component} size={48} />
+        <ComponentThumb component={component} size={52} />
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <h3 className="truncate text-[13px] leading-tight font-semibold" title={component.name}>
-                {component.name}
+              <h3 className="flex min-w-0 items-center gap-1.5 text-[13px] leading-tight font-semibold" title={component.name}>
+                <span className="truncate">{component.name}</span>
+                {installed && (
+                  <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-violet-soft px-1.5 py-px text-[10px] font-semibold text-violet">
+                    <IconCheck width={10} height={10} /> {t.catalog.installed}
+                  </span>
+                )}
               </h3>
               <p className="mt-0.5 truncate text-[11px] text-fg-3" title={`${component.brand} · ${component.model}`}>
                 {component.brand} · {component.model}
@@ -78,6 +89,11 @@ export function ComponentCard({
               </div>
             ))}
           </dl>
+          {topIssue && !open && (
+            <p className={cx("mt-2 line-clamp-2 text-[11px] leading-snug", topIssue.status === "incompatible" ? "text-bad" : "text-warn")}>
+              {topIssue.title}: {topIssue.detail}
+            </p>
+          )}
           {variants && onPickVariant && variants.length > 1 && (
             <div className="mt-2">
               <ColorSwatches variants={variants} current={component.id} onPick={onPickVariant} />

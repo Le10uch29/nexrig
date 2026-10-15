@@ -11,10 +11,14 @@ import { Badge, Button, cx, Dialog, Select } from "@/components/ui/primitives";
 
 const fmtDate = (iso: string) => new Date(iso).toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 
+/**
+ * Same provenance colours as FPS Lab: measured — cyan, transferred — violet, model — neutral.
+ * Green and amber stay reserved for check results and warnings.
+ */
 const LEVEL_STYLE: Record<FpsConfidenceLevel, { dot: string; text: string }> = {
-  verified: { dot: "bg-ok", text: "text-ok" },
-  close: { dot: "bg-cyan", text: "text-cyan" },
-  model: { dot: "bg-warn", text: "text-warn" },
+  verified: { dot: "bg-cyan", text: "text-cyan" },
+  close: { dot: "bg-violet", text: "text-violet" },
+  model: { dot: "bg-fg-2", text: "text-fg-2" },
   insufficient: { dot: "bg-fg-3", text: "text-fg-3" },
 };
 
@@ -379,7 +383,7 @@ export function AnalysisDialog() {
           </div>
         )}
 
-        <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
           <div className="space-y-3">
             <Stages />
             <div className="flex flex-wrap gap-2">

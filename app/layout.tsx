@@ -7,7 +7,7 @@ const manrope = Manrope({ variable: "--font-manrope", subsets: ["latin", "cyrill
 const jetbrains = JetBrains_Mono({ variable: "--font-jetbrains", subsets: ["latin", "cyrillic"] });
 
 export const metadata: Metadata = {
-  title: { default: "BuildAI — конфигуратор ПК", template: "%s · BuildAI" },
+  title: { default: "NexRig — конфигуратор ПК", template: "%s · NexRig" },
   description: "Интерактивная 3D-сборка ПК, проверка совместимости, оценка FPS и рекомендации по апгрейду.",
 };
 

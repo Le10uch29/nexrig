@@ -44,7 +44,8 @@ interface BuildState {
   focusComponentId: string | null;
   selectedSlot: string | null;
   hoveredSlot: string | null;
-  view: { exploded: boolean; caseMode: CaseMode; labels: boolean };
+  /** leftPanel/rightPanel: builder side panels expanded (optional: older saved state lacks them). */
+  view: { exploded: boolean; caseMode: CaseMode; labels: boolean; leftPanel?: boolean; rightPanel?: boolean };
   motion: Record<string, MotionState>;
   activity: ActivityEntry[];
   skipNonce: number;
@@ -102,7 +103,7 @@ export const useBuildStore = create<BuildState>()(
       focusComponentId: null,
       selectedSlot: null,
       hoveredSlot: null,
-      view: { exploded: false, caseMode: "glass", labels: false },
+      view: { exploded: false, caseMode: "glass", labels: false, leftPanel: true, rightPanel: true },
       motion: {},
       activity: [],
       skipNonce: 0,

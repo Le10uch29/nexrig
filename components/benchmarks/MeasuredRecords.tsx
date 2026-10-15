@@ -202,7 +202,7 @@ export function MeasuredRecords() {
   const shownOpen = open?.items ?? [];
 
   return (
-    <section className="grid gap-6 lg:grid-cols-[380px_minmax(0,1fr)]" aria-label="Реальные замеры">
+    <section className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[380px_minmax(0,1fr)]" aria-label="Реальные замеры">
       <div className="space-y-3 rounded-[var(--radius-lg)] border border-line bg-panel p-4">
         <SectionTitle>Отправить реальный замер</SectionTitle>
         <p className="text-[11.5px] leading-relaxed text-fg-3">

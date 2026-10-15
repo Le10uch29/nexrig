@@ -1,18 +1,19 @@
 @import "tailwindcss";
 
 /*
- * BuildAI design tokens. Every colour, radius, shadow and motion value used by the UI comes from here.
+ * NexRig design tokens. Every colour, radius, shadow and motion value used by the UI comes from here.
  * Dark-only product surface: deep navy base, layered charcoal panels, violet primary, cyan secondary,
  * green/amber/red reserved for status.
  */
 :root {
-  --bg-0: #06080d;
-  --bg-1: #0a0d16;
-  --panel: #0f131d;
-  --panel-2: #141927;
-  --panel-3: #1a2031;
-  --line: #222a3b;
-  --line-strong: #313a51;
+  /* Graphite-navy base, surfaces step up in lightness; borders stay low-contrast. */
+  --bg-0: #07090f;
+  --bg-1: #0b0e17;
+  --panel: #10141f;
+  --panel-2: #151a27;
+  --panel-3: #1b2131;
+  --line: #20283a;
+  --line-strong: #2f3850;
   --fg: #e8ebf3;
   --fg-2: #a5adc0;
   --fg-3: #6f7891;
@@ -32,11 +33,28 @@
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
+  --radius-xl: 18px;
   --shadow-panel: 0 1px 0 rgb(255 255 255 / 0.03) inset, 0 12px 32px -16px rgb(0 0 0 / 0.6);
   --shadow-pop: 0 18px 48px -12px rgb(0 0 0 / 0.7), 0 0 0 1px var(--line-strong);
+  /* Glass: only for controls floating over the 3D scene, where it keeps text readable. */
+  --glass-bg: rgb(13 17 27 / 0.72);
+  --glass-border: rgb(255 255 255 / 0.07);
+  --glass-blur: 12px;
+  /* Interaction states */
+  --ring: 0 0 0 2px var(--bg-0), 0 0 0 4px rgb(141 125 255 / 0.55);
+  --hover-bg: rgb(255 255 255 / 0.04);
+  --selected-bg: rgb(141 125 255 / 0.12);
+  --selected-border: rgb(141 125 255 / 0.5);
+  /* Layers */
+  --z-overlay: 10;
+  --z-nav: 40;
+  --z-modal: 50;
+  /* Layout */
+  --rail-w: 56px;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --dur-fast: 120ms;
   --dur-base: 200ms;
+  --dur-slow: 320ms;
   --nav-h: 56px;
 
   /* Semantic aliases (NexRig brief). Components may use either name; the values are shared. */
@@ -107,9 +125,11 @@
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);
   --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
   --shadow-panel: var(--shadow-panel);
   --shadow-pop: var(--shadow-pop);
   --ease-out: var(--ease-out);
+  --color-glass: var(--glass-bg);
   --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-jetbrains), ui-monospace, monospace;
 }
@@ -175,6 +195,28 @@ body {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
+}
+
+/* Floating controls over the 3D scene: translucent, blurred, hairline border. */
+.glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.2);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.2);
+}
+
+/* Section labels: small caps, muted. */
+.eyebrow {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+
+/* Width of collapsible panels animates; the 3D canvas resizes with it. */
+.panel-transition {
+  transition: grid-template-columns var(--dur-slow) var(--ease-out);
 }
 
 /* Subtle blueprint backdrop for the 3D workspace. */

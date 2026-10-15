@@ -147,15 +147,17 @@ export function BrowserBenchmark() {
   const stop = () => ctrlRef.current?.abort();
 
   return (
-    <div className="space-y-4">
-      <section className="rounded-[var(--radius-lg)] border border-line bg-panel p-4">
-        <h2 className="text-sm font-semibold">Возможности браузера</h2>
+    <div className="space-y-6">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-6 lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)]">
+      <div className="space-y-6">
+      <section className="rounded-[var(--radius-xl)] bg-panel p-5 ring-1 ring-white/[0.06]">
+        <h2 className="text-[16px] font-semibold">Возможности браузера</h2>
         <ul className="mt-2 space-y-2">
           <BackendRow name="WebGPU" info={caps?.webgpu} chosen={backend === "webgpu"} />
           <BackendRow name="WebGL2" info={caps?.webgl2} chosen={backend === "webgl2"} />
         </ul>
         {caps && (
-          <dl className="mt-3 grid gap-x-4 gap-y-1 text-[12px] sm:grid-cols-2">
+          <dl className="mt-4 grid gap-y-1.5 text-[13px]">
             <div className="flex gap-2">
               <dt className="text-fg-3">Браузер и ОС:</dt>
               <dd>
@@ -183,8 +185,8 @@ export function BrowserBenchmark() {
         )}
       </section>
 
-      <section className="rounded-[var(--radius-lg)] border border-line bg-panel p-4">
-        <div className="grid gap-3 sm:grid-cols-3">
+      <section className="rounded-[var(--radius-xl)] bg-panel p-5 ring-1 ring-white/[0.06]">
+        <div className="grid gap-4">
           <div>
             <p className="mb-1 text-[11px] text-fg-3">Графический API</p>
             <Segmented<BackendId | "auto">
@@ -271,14 +273,31 @@ export function BrowserBenchmark() {
             <IconAlert width={14} height={14} className="mt-0.5 shrink-0" /> Тест не запустился: {run.message}
           </p>
         )}
-        <div ref={previewRef} className={cx("mt-3 max-w-[640px]", !busy && !result && "hidden")} />
       </section>
+      </div>
 
-      {result && <ResultView run={result} />}
+      <div className="min-w-0 space-y-6">
+        {/* Stage: the live test scene (or a placeholder before the first run). */}
+        <div className="overflow-hidden rounded-[var(--radius-xl)] bg-[radial-gradient(120%_90%_at_50%_0%,#1d2338_0%,#0c0f18_70%)] ring-1 ring-white/[0.06]">
+          <div ref={previewRef} className={cx("[&>canvas]:block [&>canvas]:h-auto [&>canvas]:w-full [&>canvas]:rounded-none", !busy && !result && "hidden")} />
+          {!busy && !result && (
+            <div className="grid aspect-video place-items-center p-6 text-center">
+              <div>
+                <p className="text-[18px] font-semibold">Здесь появится тестовая сцена</p>
+                <p className="mt-1 text-[14px] text-fg-3">
+                  {preset.instances.toLocaleString("ru-RU")} объектов · {preset.width}×{preset.height} · {mode.label.toLowerCase()}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+        {result && <ResultView run={result} />}
+      </div>
+      </div>
 
-      <section className="rounded-[var(--radius-lg)] border border-line bg-panel p-4">
+      <section className="rounded-[var(--radius-xl)] bg-panel p-5 ring-1 ring-white/[0.06]">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold">История на этом устройстве</h2>
+          <h2 className="text-[16px] font-semibold">История на этом устройстве</h2>
           <Switch checked={consent} onChange={setBenchConsent} label="Сохранять историю в этом браузере" />
         </div>
         <p className="mt-1 text-[11.5px] text-fg-3">Хранится только в localStorage этого браузера и никуда не отправляется. Выключение удаляет сохранённую историю.</p>
@@ -326,7 +345,7 @@ function ResultView({ run }: { run: BenchRun }) {
   // Interrupted before anything was measured (e.g. tab hidden during warm-up): no figures at all.
   if (!s.measured) {
     return (
-      <section className="space-y-2 rounded-[var(--radius-lg)] border border-warn/40 bg-panel p-4" aria-live="polite">
+      <section className="space-y-2 rounded-[var(--radius-xl)] bg-panel p-5 ring-1 ring-warn/40" aria-live="polite">
         <div className="flex items-center justify-between gap-2">
           <p className="text-sm font-semibold">Измерение не выполнено</p>
           <Badge tone="warn">недостоверно</Badge>
@@ -353,14 +372,14 @@ function ResultView({ run }: { run: BenchRun }) {
   ];
   if (s.drift !== null) metrics.push(["Изменение к концу теста", `${s.drift >= 0 ? "+" : ""}${Math.round(s.drift * 100)}%`]);
   return (
-    <section className="space-y-3 rounded-[var(--radius-lg)] border border-line bg-panel p-4" aria-live="polite">
+    <section className="space-y-4 rounded-[var(--radius-xl)] bg-panel p-5 ring-1 ring-white/[0.06] md:p-6" aria-live="polite">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <p className="text-[11px] text-fg-3">
             {BENCH_VERSION} · {BACKEND_LABEL[run.backend]} · {BENCH_PRESETS[run.preset].label} ({run.width}×{run.height}) · {run.mode === "short" ? "короткий тест" : "тест устойчивости"}
           </p>
-          <p className="num text-3xl font-semibold">
-            {s.medianFps} <span className="text-base font-normal text-fg-3">кадр/с в тестовой сцене</span>
+          <p className="num mt-1 text-[56px] leading-none font-semibold tracking-tight">
+            {s.medianFps} <span className="font-sans text-[17px] font-normal text-fg-3">кадр/с в тестовой сцене</span>
           </p>
         </div>
         <Badge tone={run.valid ? (run.issues.length ? "warn" : "cyan") : "warn"}>{run.valid ? (run.issues.length ? "с замечаниями" : "достоверно") : "недостоверно"}</Badge>

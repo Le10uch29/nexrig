@@ -173,3 +173,9 @@ export const IconMenu = (p: P) => (
     <path d="M4 7h16M4 12h16M4 17h16" />
   </svg>
 );
+export const IconSidebar = (p: P) => (
+  <svg {...base(p)}>
+    <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+    <path d="M9 4.5v15" />
+  </svg>
+);

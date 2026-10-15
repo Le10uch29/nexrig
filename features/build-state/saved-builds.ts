@@ -55,7 +55,7 @@ export const useSavedBuilds = create<SavedBuildsState>()(
       importJson: (json) => {
         try {
           const parsed = savedBuildSchema.safeParse(JSON.parse(json));
-          if (!parsed.success) return { ok: false, error: "Файл не похож на сборку BuildAI." };
+          if (!parsed.success) return { ok: false, error: "Файл не похож на сборку NexRig." };
           return { ok: true, build: get().save(parsed.data.name, parsed.data.selection) };
         } catch {
           return { ok: false, error: "Некорректный JSON." };

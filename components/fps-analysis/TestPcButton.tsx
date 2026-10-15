@@ -34,22 +34,31 @@ export function TestPcButton() {
 
   return (
     <>
-      <div className="absolute top-28 right-3 flex w-40 flex-col items-stretch gap-1 sm:top-[68px] sm:w-48">
+      <div className="flex flex-col items-end gap-1">
         <button
           type="button"
           onClick={onClick}
           disabled={!ready}
           aria-describedby={!ready ? "test-pc-missing" : undefined}
+          aria-label="Протестировать сборку"
           className={cx(
-            "inline-flex h-10 items-center justify-center gap-2 rounded-[var(--radius-md)] border px-3 text-sm font-semibold transition-colors",
-            ready ? "border-transparent bg-violet-strong text-white shadow-[0_8px_24px_-10px_var(--violet-strong)] hover:bg-violet" : "cursor-not-allowed border-line bg-panel/85 text-fg-3 backdrop-blur",
+            "inline-flex h-9 items-center justify-center gap-2 rounded-[var(--radius-md)] border px-3.5 text-[13px] font-semibold whitespace-nowrap transition-colors",
+            ready ? "border-transparent bg-violet-strong text-white shadow-[0_8px_24px_-12px_var(--violet-strong)] hover:bg-violet" : "glass cursor-not-allowed text-fg-3",
           )}
         >
           <IconGauge className={running ? "animate-pulse" : undefined} />
-          {running ? "Идёт анализ…" : "Протестировать сборку"}
+          {running ? (
+            "Анализ…"
+          ) : (
+            <>
+              {/* Short label when the scene is narrow (container query on the scene). */}
+              <span className="@max-3xl:hidden">Протестировать сборку</span>
+              <span className="@3xl:hidden">Тест</span>
+            </>
+          )}
         </button>
         {!ready && (
-          <p id="test-pc-missing" className="rounded-[var(--radius-sm)] bg-panel/85 px-2 py-1 text-center text-[11px] leading-snug text-fg-3 backdrop-blur">
+          <p id="test-pc-missing" className="glass rounded-[var(--radius-sm)] px-2 py-0.5 text-[11px] text-fg-3">
             Добавьте {missing.join(" и ")}
           </p>
         )}

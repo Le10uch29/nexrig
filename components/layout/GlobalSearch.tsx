@@ -47,7 +47,8 @@ export function GlobalSearch() {
 
   return (
     <div className="relative">
-      <div className="flex h-9 w-[min(42vw,300px)] items-center gap-2 rounded-[var(--radius-md)] border border-line bg-panel px-2.5 focus-within:border-violet/60">
+      {/* Phones: an icon that expands into a full-width field while focused; wider screens: a field. */}
+      <label className="flex h-9 w-9 items-center gap-2 rounded-[var(--radius-md)] border border-line bg-panel px-2.5 focus-within:border-violet/60 max-sm:focus-within:fixed max-sm:focus-within:inset-x-3 max-sm:focus-within:top-[9px] max-sm:focus-within:z-50 max-sm:focus-within:w-auto sm:w-[min(42vw,300px)] lg:w-40 xl:w-[300px]">
         <IconSearch className="shrink-0 text-fg-3" />
         <input
           ref={inputRef}
@@ -81,13 +82,13 @@ export function GlobalSearch() {
           }}
           className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-fg-3"
         />
-        <kbd className="hidden rounded border border-line px-1.5 text-[10px] text-fg-3 sm:inline">{t.nav.searchShortcut}</kbd>
-      </div>
+        <kbd className="hidden rounded border border-line px-1.5 text-[10px] text-fg-3 sm:inline lg:hidden xl:inline">{t.nav.searchShortcut}</kbd>
+      </label>
       {open && q.length > 0 && (
         <ul
           id={listId}
           role="listbox"
-          className="animate-in absolute right-0 z-50 mt-2 max-h-96 w-[min(92vw,380px)] overflow-auto rounded-[var(--radius-lg)] border border-line-strong bg-panel p-1.5 shadow-pop scroll-thin"
+          className="animate-in absolute right-0 z-50 mt-2 max-h-96 w-[min(92vw,380px)] max-sm:fixed max-sm:inset-x-3 max-sm:top-[52px] max-sm:w-auto overflow-auto rounded-[var(--radius-lg)] border border-line-strong bg-panel p-1.5 shadow-pop scroll-thin"
         >
           {results.length === 0 && <li className="px-3 py-4 text-center text-xs text-fg-3">{t.catalog.empty}</li>}
           {results.map((c, i) => (

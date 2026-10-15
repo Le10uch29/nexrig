@@ -47,12 +47,24 @@ function CameraRig({ framing, reducedMotion }: { framing: Framing; reducedMotion
   /** Once the user orbits/zooms, automatic re-framing (resize, case swap) stops. */
   const userMoved = useRef(false);
 
+  /** First framing is applied instantly; later re-framing (panel resize, case swap) eases in. */
+  const framed = useRef(false);
   useEffect(() => {
     if (userMoved.current) return;
-    camera.position.copy(framing.position);
-    controls.current?.target.copy(framing.target);
-    controls.current?.update();
-  }, [camera, framing]);
+    const c = controls.current;
+    if (!framed.current || reducedMotion || !c) {
+      camera.position.copy(framing.position);
+      c?.target.copy(framing.target);
+      c?.update();
+      framed.current = true;
+      return;
+    }
+    const tweens = [
+      gsap.to(camera.position, { x: framing.position.x, y: framing.position.y, z: framing.position.z, duration: 0.45, ease: "power2.out", onUpdate: () => c.update() }),
+      gsap.to(c.target, { x: framing.target.x, y: framing.target.y, z: framing.target.z, duration: 0.45, ease: "power2.out", onUpdate: () => c.update() }),
+    ];
+    return () => tweens.forEach((tw) => tw.kill());
+  }, [camera, framing, reducedMotion]);
 
   useEffect(() => {
     if (!cameraNonce || !controls.current) return;
