@@ -64,10 +64,30 @@ describe("multi-source analysis: matching tiers", () => {
     expect(r.avg!.low).toBeLessThan(r.avg!.high);
   });
 
-  it("ranks a same-CPU test with another GPU as tier 3", () => {
+  it("uses a GPU within ±30% as tier 4 and ignores farther GPUs", () => {
+    const closeGpu = Math.abs(otherGpu.rasterIndex / gpu.rasterIndex - 1) <= 0.3;
     const r = analyzeResolution(target, game, "1440p", [record({ gpuId: otherGpu.id, avgFps: 80 })]);
-    expect(r.tier).toBe(3);
-    expect(r.tests[0].differences.some((d) => d.startsWith("Видеокарта"))).toBe(true);
+    if (closeGpu) {
+      expect(r.tier).toBe(4);
+      expect(r.provenance).toBe("estimated");
+      expect(r.tests[0].differences.some((d) => d.startsWith("Видеокарта"))).toBe(true);
+    } else expect(r.level).toBe("model");
+    const far = analyzeResolution(target, game, "1440p", [record({ gpuId: "asus-rog-strix-rtx-4090", avgFps: 200 })]);
+    expect(far.level).toBe("model");
+  });
+
+  it("uses the same GPU in another game (same preset) or another preset (same game) as tier 3", () => {
+    const other = GAMES.find((g) => g.id !== game.id)!;
+    const r1 = analyzeResolution(target, game, "1440p", [record({ gameId: other.id, avgFps: 150 })]);
+    expect(r1.tier).toBe(3);
+    expect(r1.tests[0].differences.some((d) => d.startsWith("Игра"))).toBe(true);
+    expect(r1.tests[0].transfer.method).toContain("→");
+    const r2 = analyzeResolution(target, game, "1440p", [record({ settings: { ...base, resolution: "1440p", preset: "ultra" }, avgFps: 80 })]);
+    expect(r2.tier).toBe(3);
+    expect(r2.tests[0].differences.some((d) => d.startsWith("Пресет"))).toBe(true);
+    // Another game AND another preset is too far.
+    const r3 = analyzeResolution(target, game, "1440p", [record({ gameId: other.id, settings: { ...base, resolution: "1440p", preset: "ultra" } })]);
+    expect(r3.level).toBe("model");
   });
 
   it("prefers the closest tier and keeps farther tiers out of the result", () => {
@@ -86,9 +106,40 @@ describe("multi-source analysis: matching tiers", () => {
     expect(fg.frameGen).toBe(true);
   });
 
-  it("does not transfer across presets, RT or upscaling", () => {
-    const r = analyzeResolution(target, game, "1440p", [record({ settings: { ...base, resolution: "1440p", preset: "ultra" } })]);
-    expect(r.level).toBe("model");
+  it("does not transfer across RT or upscaling", () => {
+    expect(analyzeResolution(target, game, "1440p", [record({ settings: { ...base, resolution: "1440p", rayTracing: true } })]).level).toBe("model");
+    expect(analyzeResolution(target, game, "1440p", [record({ settings: { ...base, resolution: "1440p", upscaling: "quality", upscaler: "DLSS" } })]).level).toBe("model");
+  });
+
+  it("labels every value as measured, estimated or modeled", () => {
+    expect(analyzeResolution(target, game, "1440p", [record()]).provenance).toBe("measured");
+    expect(analyzeResolution(target, game, "1440p", [record({ cpuId: otherCpu.id })]).provenance).toBe("estimated");
+    expect(analyzeResolution(target, game, "1440p", []).provenance).toBe("modeled");
+    // A mix of exact and transferred tests is not presented as a pure measurement.
+    expect(analyzeResolution(target, game, "1440p", [record(), record({ cpuId: otherCpu.id })]).provenance).toBe("estimated");
+  });
+
+  it("down-weights stale tests and lowers confidence when all tests are stale", () => {
+    const now = new Date("2026-10-15");
+    const fresh = analyzeResolution(target, game, "1440p", [record({ cpuId: otherCpu.id, testDate: "2026-06-01" }), record({ cpuId: otherCpu.id, testDate: "2026-05-01", avgFps: 99 })], undefined, now);
+    const old = analyzeResolution(target, game, "1440p", [record({ cpuId: otherCpu.id, testDate: "2021-06-01" }), record({ cpuId: otherCpu.id, testDate: "2021-05-01", avgFps: 99 })], undefined, now);
+    expect(old.tests.every((t) => t.stale)).toBe(true);
+    expect(old.tests[0].differences.some((d) => d.includes("старше"))).toBe(true);
+    expect(old.tests[0].uncertainty).toBeGreaterThan(fresh.tests[0].uncertainty);
+    expect(old.confidence).toBe("low");
+    expect(fresh.confidence).toBe("medium");
+    // Fresh and stale conflicting: the fresher test weighs more.
+    const mixed = analyzeResolution(target, game, "1440p", [record({ cpuId: otherCpu.id, testDate: "2026-06-01", avgFps: 100 }), record({ cpuId: otherCpu.id, testDate: "2019-01-01", avgFps: 150 })], undefined, now);
+    const near = (v: number, x: number) => Math.abs(v - x) / x;
+    expect(near(mixed.avg!.mid, mixed.tests.find((t) => !t.stale)!.transferred.avg)).toBeLessThan(near(mixed.avg!.mid, mixed.tests.find((t) => t.stale)!.transferred.avg));
+  });
+
+  it("computes presets, RT and frame generation separately", () => {
+    const r = analyzeBuild({ target, games: [game], records: [record()] }).games[0].results[1];
+    expect(r.variants!.presets.map((p) => p.preset)).toEqual(["low", "medium", "high", "ultra"]);
+    expect(r.variants!.presets.find((p) => p.preset === "high")!.provenance).toBe("measured");
+    expect(r.variants!.presets.find((p) => p.preset === "low")!.provenance).not.toBe("measured");
+    if (r.variants!.frameGen) expect(r.variants!.frameGen.provenance).toBe("modeled");
   });
 
   it("removes outliers and reports them", () => {
@@ -235,11 +286,39 @@ describe("POST /api/fps/analyze", () => {
       .map((l) => JSON.parse(l) as AnalysisEvent);
   };
 
+  it("drops the cached result when an existing record is edited or deleted (fix 7)", async () => {
+    const { getBenchmarkStore } = await import("@/lib/fps-engine/store");
+    const store = getBenchmarkStore();
+    const other = GAMES[1];
+    const b = { cpuId: cpu.id, gpuId: gpu.id, settings: base, gameIds: [other.id] };
+    await store.insertBatch([record({ id: "cache-1", gameId: other.id, verification: "unverified" })], { id: "b-cache", sourceId: "nexrig", createdAt: new Date().toISOString(), rowCount: 1, status: "committed" });
+    await store.update("cache-1", { verification: "verified" });
+    const resultOf = (ev: AnalysisEvent[]) => ev.find((e) => e.type === "result") as Extract<AnalysisEvent, { type: "result" }>;
+
+    const first = resultOf(await run(b));
+    expect(first.cached).toBe(false);
+    expect(first.report.games[0].results[1].avg?.mid).toBe(97);
+    expect(resultOf(await run(b)).cached).toBe(true); // nothing changed
+
+    // Same number of records, different value: must not be served from the cache.
+    await new Promise((r) => setTimeout(r, 5));
+    await store.update("cache-1", { avgFps: 120 });
+    const edited = resultOf(await run(b));
+    expect(edited.cached).toBe(false);
+    expect(edited.report.games[0].results[1].avg?.mid).toBe(120);
+
+    await store.remove("cache-1");
+    const removed = resultOf(await run(b));
+    expect(removed.cached).toBe(false);
+    expect(removed.report.games[0].results[1].tests.some((t) => t.recordId === "cache-1")).toBe(false);
+    expect(removed.report.games[0].results[1].level).not.toBe("verified");
+  });
+
   it("streams all ten stages and a report, then serves the cache with its date", async () => {
     const events = await run(body);
     expect(events[0]).toMatchObject({ type: "start", cached: false });
     const finished = new Set(events.filter((e) => e.type === "stage" && e.status !== "running").map((e) => (e as { id: string }).id));
-    expect(finished.size).toBe(10);
+    expect(finished.size).toBe(8);
     const result = events.find((e) => e.type === "result");
     expect(result && result.type === "result" && result.report.games[0].results).toHaveLength(3);
 
@@ -263,5 +342,34 @@ describe("POST /api/fps/analyze", () => {
     const { GET } = await import("@/app/api/admin/sources/route");
     const res = await GET(new Request("http://x/api/admin/sources"));
     expect([401, 503]).toContain(res.status);
+  });
+});
+
+describe("FPS Lab: verified vs own data (fix 5)", () => {
+  it("never feeds the user's own unverified records into the calculation", async () => {
+    const { splitLabRecords } = await import("@/features/benchmarks/records");
+    const { computeFps } = await import("@/lib/fps-engine/engine");
+    const own = [{ ...record({ id: "own-1" }), verification: undefined, source: { kind: "user" as const, label: "Мой замер" } }];
+    const split = splitLabRecords(own, [], { gameId: game.id, cpuId: cpu.id, gpuId: gpu.id, settings: { resolution: "1440p" } });
+    expect(split.forCalculation).toHaveLength(0);
+    expect(split.ownMatching).toHaveLength(1);
+    const r = computeFps({ game, cpu, gpu, settings: { ...base, resolution: "1440p" }, records: split.forCalculation });
+    expect(r.level).toBe("model"); // not "Подтверждённый тест"
+    // Unverified server rows (should never arrive) are dropped as well.
+    expect(splitLabRecords([], [record({ verification: "unverified" })], { gameId: game.id, settings: { resolution: "1440p" } }).forCalculation).toHaveLength(0);
+  });
+
+  it("links every source a value is based on", async () => {
+    const { computeFps } = await import("@/lib/fps-engine/engine");
+    const s = { ...base, resolution: "1440p" as const };
+    const measured = computeFps({ game, cpu, gpu, settings: s, records: [record({ id: "s1", testDate: "2026-02-01" }), record({ id: "s2", testDate: "2026-03-01", source: { kind: "dataset", label: "Второй обзор", url: "https://example.org/b" } })] });
+    expect(measured.level).toBe("verified");
+    expect(measured.sources.map((x) => x.label)).toEqual(["Второй обзор", "Тестовый обзор"]);
+    expect(measured.sources.every((x) => x.url)).toBe(true);
+    const calibrated = computeFps({ game, cpu, gpu, settings: s, records: [record({ id: "s3", cpuId: otherCpu.id, settings: { ...base, resolution: "1080p" } })] });
+    expect(calibrated.level).toBe("close");
+    expect(calibrated.sources).toHaveLength(1);
+    expect(calibrated.sources[0].url).toMatch(/^https:\/\/example\.com\//);
+    expect(computeFps({ game, cpu, gpu, settings: s, records: [] }).sources).toEqual([]);
   });
 });

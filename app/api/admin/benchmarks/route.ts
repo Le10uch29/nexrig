@@ -80,7 +80,7 @@ export async function PATCH(request: Request) {
     const avg = patch.avgFps ?? current.avgFps;
     const low = patch.low1Fps ?? current.low1Fps;
     if (low !== undefined && low > avg) return Response.json({ error: "1% low не может быть выше среднего FPS." }, { status: 422 });
-    return Response.json(await store.update(id, patch));
+    return Response.json(await store.update(id, { ...patch, reviewedBy: auth.userId }));
   } catch (e) {
     return storeErrorResponse(e);
   }

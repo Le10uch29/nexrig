@@ -9,7 +9,7 @@ import { CURRENCIES, RATES_AS_OF, RUB_PER_UNIT, useCurrencyStore } from "@/featu
 import { useAuth, useAuthDialog } from "@/features/auth/use-auth";
 import { getBrowserSupabase } from "@/lib/supabase/client";
 import { useMessages } from "@/lib/i18n";
-import { IconArrowUp, IconCube, IconDatabase, IconGauge, IconMenu, IconSpark, IconUser } from "@/components/ui/icons";
+import { IconArrowUp, IconBolt, IconCube, IconDatabase, IconGauge, IconMenu, IconUser } from "@/components/ui/icons";
 import { cx } from "@/components/ui/primitives";
 import { GlobalSearch } from "./GlobalSearch";
 
@@ -35,8 +35,8 @@ export function TopNav() {
   const links = [
     { href: "/builder", label: t.nav.builder, icon: IconCube },
     { href: "/games", label: t.nav.games, icon: IconGauge },
+    { href: "/benchmark", label: t.nav.benchmark, icon: IconBolt },
     { href: "/upgrade", label: t.nav.upgrade, icon: IconArrowUp },
-    { href: "/expert", label: t.nav.expert, icon: IconSpark },
     { href: "/database", label: t.nav.database, icon: IconDatabase },
   ];
 
@@ -54,11 +54,11 @@ export function TopNav() {
                 href={l.href}
                 aria-current={active ? "page" : undefined}
                 className={cx(
-                  "flex h-8 items-center gap-2 rounded-[var(--radius-sm)] px-2.5 text-[13px] font-medium transition-colors",
+                  "flex h-8 items-center gap-2 rounded-[var(--radius-sm)] px-2 text-[13px] font-medium whitespace-nowrap transition-colors xl:px-2.5",
                   active ? "bg-panel-2 text-fg shadow-[0_0_0_1px_var(--line)]" : "text-fg-3 hover:text-fg",
                 )}
               >
-                <l.icon className={active ? "text-violet" : undefined} />
+                <l.icon className={cx("hidden xl:block", active && "text-violet")} />
                 {l.label}
               </Link>
             );

@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import type { AnalysisReport } from "@/lib/fps-engine/analysis";
+import type { BuildSelection } from "@/types/build";
 import { ANALYSIS_STAGES, type AnalysisEvent, type StageId, type StageStatus } from "@/lib/fps-engine/analysis-stages";
 
 /** Request body of /api/fps/analyze (see analyzeSchema). */
@@ -11,6 +12,7 @@ export interface AnalyzeRequest {
   ram?: { type: "DDR3" | "DDR4" | "DDR5"; speedMtps: number; modules: number; moduleGb?: number };
   settings: { preset: "low" | "medium" | "high" | "ultra"; rayTracing: boolean; upscaling: "off" | "quality" | "balanced" | "performance"; upscaler?: "DLSS" | "FSR" | "XeSS" | null; frameGen?: boolean };
   buildVersion: string;
+  selection?: BuildSelection;
 }
 
 /** The configuration as it was when the test started (it does not follow later edits). */

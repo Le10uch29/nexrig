@@ -78,6 +78,8 @@ export interface BenchmarkRecord {
   importBatchId?: string;
   /** Auth user who submitted the measurement (community submissions). Never exposed publicly. */
   submittedBy?: string;
+  /** Set by the public API instead of submittedBy: a verified measurement sent by a user. */
+  community?: boolean;
   createdAt?: string;
 }
 
@@ -123,6 +125,8 @@ export interface FpsEstimate {
   confidenceReasons: string[];
   dataSource: string | null;
   sourceUrl: string | null;
+  /** Every record the value is based on, each with its own link (measured or calibration anchors). */
+  sources: EstimateSource[];
   benchmarkDate: string | null;
   gameVersion: string | null;
   calculationMethod: string;
@@ -133,6 +137,14 @@ export interface FpsEstimate {
 }
 
 export type Confidence = "low" | "medium" | "high";
+
+export interface EstimateSource {
+  label: string;
+  url: string | null;
+  date: string;
+  /** Sent by a NexRig user (and verified by an admin). */
+  community: boolean;
+}
 
 export interface ModelBreakdown {
   avgFps: number;
@@ -170,6 +182,6 @@ export type PerformanceResult =
       /** The records were taken with frame generation: avgFps counts interpolated frames. */
       frameGenIncluded: boolean;
     }
-  | ({ kind: "calibrated"; calibrationRecords: number } & ModelBreakdown)
+  | ({ kind: "calibrated"; calibrationRecords: number; anchors: BenchmarkRecord[] } & ModelBreakdown)
   | ({ kind: "estimated" } & ModelBreakdown)
   | { kind: "unavailable"; reason: string };

@@ -271,6 +271,7 @@ export function getPerformance({ game, cpu, gpu, settings, measured: all, memory
 
   // Calibration: real records of the same GPU in this game (any CPU/settings) correct the model.
   const anchors = measured.filter((r) => r.gameId === game.id && r.gpuId === gpu.id && comparableForCalibration(r.settings, settings));
+  const used: BenchmarkRecord[] = [];
   const ratios = anchors
     .map((r) => {
       const rCpu = hardwareRepository.byId(r.cpuId);
@@ -278,9 +279,12 @@ export function getPerformance({ game, cpu, gpu, settings, measured: all, memory
       const m = estimateFps({ game, cpu: rCpu, gpu, settings: r.settings });
       // Frame-generation records report presented frames: compare them with the model's presented FPS.
       const modelled = r.settings.frameGen ? (m.frameGenFps ?? m.avgFps) : m.avgFps;
-      return r.avgFps / modelled;
+      const ratio = r.avgFps / modelled;
+      if (!Number.isFinite(ratio)) return null;
+      used.push(r);
+      return ratio;
     })
-    .filter((x): x is number => x !== null && Number.isFinite(x));
+    .filter((x): x is number => x !== null);
   const lowRatios = anchors.filter((r) => r.low1Fps && r.avgFps > 0).map((r) => r.low1Fps! / r.avgFps);
   if (ratios.length) {
     const k = Math.max(0.5, Math.min(1.8, median(ratios)));
@@ -301,7 +305,7 @@ export function getPerformance({ game, cpu, gpu, settings, measured: all, memory
       method: `${MODEL_VERSION}, калибровка по ${ratios.length} замер(ам) этой видеокарты в игре (коэффициент ${k.toFixed(2)})`,
       assumptions: [...estimate.assumptions, "Оценка скорректирована по реальным замерам той же видеокарты в этой игре с тем же пресетом, RT и генерацией кадров (другое разрешение или процессор)."],
     };
-    return { ...calibrated, kind: "calibrated", calibrationRecords: ratios.length };
+    return { ...calibrated, kind: "calibrated", calibrationRecords: ratios.length, anchors: used };
   }
   const r5 = roundModelFps;
   return {

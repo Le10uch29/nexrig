@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { GAMES } from "@/data/games";
-import { useMeasuredBenchmarks } from "@/features/benchmarks/measured-store";
 import { useBuildDerived } from "@/features/build-state/derived";
 import { useBuildStore } from "@/features/build-state/store";
 import { getPerformance, memoryOf } from "@/lib/benchmark-engine/estimate";
@@ -10,13 +9,15 @@ import { useMessages } from "@/lib/i18n";
 import { cx, SectionTitle } from "@/components/ui/primitives";
 import { FpsResult } from "./FpsResult";
 import { PerformanceControls } from "./PerformanceControls";
+import { useVerifiedRecords } from "./useServerData";
 
 export function PerformancePanel() {
   const t = useMessages();
   const { resolved } = useBuildDerived();
   const perf = useBuildStore((s) => s.perf);
   const setPerf = useBuildStore((s) => s.setPerf);
-  const measured = useMeasuredBenchmarks((s) => s.records);
+  // Verified NexRig records only — the user's own unverified records are never shown as a measurement.
+  const measured = useVerifiedRecords([resolved.gpu?.id]).records;
   const game = GAMES.find((g) => g.id === perf.gameId);
   const result = getPerformance({ game, cpu: resolved.cpu, gpu: resolved.gpu, settings: perf.settings, measured, memory: memoryOf(resolved.ram, resolved.ramCount) });
 

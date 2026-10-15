@@ -24,7 +24,7 @@ it("isolates failing stages and still returns a labelled result", async () => {
     .split("\n")
     .map((l) => JSON.parse(l) as AnalysisEvent);
   const errors = events.filter((e) => e.type === "stage" && e.status === "error").map((e) => (e as { id: string }).id);
-  expect(errors).toEqual(expect.arrayContaining(["sources", "exact", "gpu", "cpu", "similar"]));
+  expect(errors).toEqual(expect.arrayContaining(["sources", "similar"]));
   const result = events.find((e) => e.type === "result");
   expect(result?.type).toBe("result");
   if (result?.type !== "result") return;

@@ -151,7 +151,7 @@ export const SOURCE_CATALOG: SourceAudit[] = [
     domain: "3dmark.com",
     feedUrl: null,
     integration: "manual-import",
-    integrationLabel: "не используется для FPS",
+    integrationLabel: "недоступен",
     data: "Баллы синтетических тестов, а не FPS в играх.",
     access: "Публичного API нет.",
     auth: "Поиск по результатам — на сайте UL.",

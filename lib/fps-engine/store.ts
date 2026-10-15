@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { GAMES } from "@/data/games";
 import { hardwareRepository } from "@/lib/hardware/repository";
 import type { BenchmarkRecord, DataSourceInfo, Resolution, VerificationStatus } from "@/types/benchmark";
+import type { PublicBrowserResult } from "@/lib/browser-bench/submission";
 import { catalogEntry } from "./catalog";
 import { dedupeKey } from "./validation";
 
@@ -35,6 +36,9 @@ export interface BenchmarkFilter {
   cpuId?: string;
   gpuId?: string;
   resolution?: Resolution;
+  preset?: BenchmarkRecord["settings"]["preset"];
+  rayTracing?: boolean;
+  frameGen?: boolean;
   sourceId?: string;
   /** Leave out records of these sources (switched off by an admin). */
   excludeSources?: string[];
@@ -55,6 +59,8 @@ export interface RecordPatch {
   method?: string;
   gameVersion?: string;
   verification?: VerificationStatus;
+  /** Admin who changed the verification status (auth user id; null for the script token). */
+  reviewedBy?: string | null;
 }
 
 /** Stored state of a data source (data_sources table). */
@@ -84,7 +90,50 @@ export interface BenchmarkStore {
   sourceStates(): Promise<SourceState[]>;
   /** Inserts or updates one source state. */
   saveSourceState(state: SourceState): Promise<void>;
+  /** Published browser benchmark results (mode B). Returns false for a duplicate. */
+  insertBrowserResult(result: StoredBrowserResult): Promise<boolean>;
+  listBrowserResults(filter: BrowserResultFilter, page?: number, pageSize?: number): Promise<Page<StoredBrowserResult>>;
+  countBrowserResults(filter: BrowserResultFilter): Promise<number>;
+  /** Moderation: sets the status and records who reviewed it and when. */
+  setBrowserResultStatus(id: string, status: StoredBrowserResult["status"], reviewedBy: string | null): Promise<StoredBrowserResult | null>;
+  /** Changes whenever verified data changes (insert, edit, verification, delete): cache key. */
+  dataVersion(): Promise<string>;
 }
+
+/** A browser benchmark result as stored (submittedBy and fingerprint are never public). */
+export interface StoredBrowserResult extends PublicBrowserResult {
+  width: number;
+  height: number;
+  batches: number;
+  durationMs: number;
+  wallMs: number;
+  medianFrameMs: number;
+  windowFps: number[];
+  issues: string[];
+  logicalCores: number | null;
+  fingerprint: string;
+  submittedBy: string | null;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+}
+
+export interface BrowserResultFilter {
+  version?: string;
+  preset?: string;
+  backend?: string;
+  mode?: string;
+  /** "public" = everything except rejected. */
+  status?: StoredBrowserResult["status"] | "public" | "any";
+  submittedBy?: string;
+}
+
+const browserMatches = (r: StoredBrowserResult, f: BrowserResultFilter) =>
+  (!f.version || r.version === f.version) &&
+  (!f.preset || r.preset === f.preset) &&
+  (!f.backend || r.backend === f.backend) &&
+  (!f.mode || r.mode === f.mode) &&
+  (!f.submittedBy || r.submittedBy === f.submittedBy) &&
+  (!f.status || f.status === "any" || (f.status === "public" ? r.status !== "rejected" : r.status === f.status));
 
 export class StoreError extends Error {
   constructor(
@@ -122,6 +171,9 @@ const matches = (r: BenchmarkRecord, f: BenchmarkFilter) =>
   (!f.cpuId || r.cpuId === f.cpuId) &&
   (!f.gpuId || r.gpuId === f.gpuId) &&
   (!f.resolution || r.settings.resolution === f.resolution) &&
+  (!f.preset || r.settings.preset === f.preset) &&
+  (f.rayTracing === undefined || r.settings.rayTracing === f.rayTracing) &&
+  (f.frameGen === undefined || Boolean(r.settings.frameGen) === f.frameGen) &&
   (!f.sourceId || r.sourceId === f.sourceId) &&
   (!f.excludeSources?.length || !r.sourceId || !f.excludeSources.includes(r.sourceId)) &&
   (!f.verification || f.verification === "any" || (r.verification ?? "unverified") === f.verification);
@@ -131,7 +183,7 @@ const MODIFIED_SLACK_MS = 1000;
 const modifiedAfterImport = (r: { createdAt?: string; updatedAt?: string }) =>
   Boolean(r.createdAt && r.updatedAt && Date.parse(r.updatedAt) - Date.parse(r.createdAt) > MODIFIED_SLACK_MS);
 
-type StoredRecord = BenchmarkRecord & { updatedAt?: string };
+type StoredRecord = BenchmarkRecord & { updatedAt?: string; verifiedBy?: string | null };
 
 /* ------------------------------------------------------------------ file store (development) */
 
@@ -139,6 +191,7 @@ interface StoreData {
   records: StoredRecord[];
   batches: ImportBatch[];
   sources?: SourceState[];
+  browserResults?: StoredBrowserResult[];
 }
 
 export function createFileStore(file: string): BenchmarkStore {
@@ -149,7 +202,7 @@ export function createFileStore(file: string): BenchmarkStore {
     if (cache) return cache;
     try {
       const parsed = JSON.parse(await readFile(/*turbopackIgnore: true*/ file, "utf8")) as Partial<StoreData>;
-      cache = { records: parsed.records ?? [], batches: parsed.batches ?? [], sources: parsed.sources ?? [] };
+      cache = { records: parsed.records ?? [], batches: parsed.batches ?? [], sources: parsed.sources ?? [], browserResults: parsed.browserResults ?? [] };
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw new StoreError("Хранилище замеров повреждено или недоступно для чтения.");
       cache = { records: [], batches: [] };
@@ -226,7 +279,9 @@ export function createFileStore(file: string): BenchmarkStore {
       return mutate((d) => {
         const r = d.records.find((x) => x.id === id);
         if (!r) return null;
-        Object.assign(r, patch, { updatedAt: new Date().toISOString() });
+        const { reviewedBy, ...fields } = patch;
+        Object.assign(r, fields, { updatedAt: new Date().toISOString() });
+        if (fields.verification !== undefined) r.verifiedBy = fields.verification === "verified" ? (reviewedBy ?? null) : null;
         return r;
       });
     },
@@ -250,6 +305,38 @@ export function createFileStore(file: string): BenchmarkStore {
     },
     async sourceStates() {
       return (await load()).sources ?? [];
+    },
+    async dataVersion() {
+      const { records } = await load();
+      const verified = records.filter((r) => r.verification === "verified").length;
+      const latest = records.reduce((m, r) => (r.updatedAt && r.updatedAt > m ? r.updatedAt : m), "");
+      return `${verified}|${records.length}|${latest}`;
+    },
+    insertBrowserResult(result) {
+      return mutate((d) => {
+        const list = (d.browserResults ??= []);
+        if (list.some((r) => r.submittedBy === result.submittedBy && r.fingerprint === result.fingerprint)) return false;
+        list.push(result);
+        return true;
+      });
+    },
+    async listBrowserResults(filter, page = 1, pageSize = 50) {
+      const size = Math.min(100, Math.max(1, pageSize));
+      const all = ((await load()).browserResults ?? []).filter((r) => browserMatches(r, filter)).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      return { items: all.slice((page - 1) * size, page * size), total: all.length, page, pageSize: size };
+    },
+    async countBrowserResults(filter) {
+      return ((await load()).browserResults ?? []).filter((r) => browserMatches(r, filter)).length;
+    },
+    setBrowserResultStatus(id, status, reviewedBy) {
+      return mutate((d) => {
+        const r = (d.browserResults ?? []).find((x) => x.id === id);
+        if (!r) return null;
+        r.status = status;
+        r.reviewedBy = reviewedBy;
+        r.reviewedAt = new Date().toISOString();
+        return r;
+      });
     },
     saveSourceState(state) {
       return mutate((d) => {
@@ -365,10 +452,96 @@ function filterQuery(f: BenchmarkFilter) {
   if (f.cpuId) q.push(`cpu_id=eq.${enc(f.cpuId)}`);
   if (f.gpuId) q.push(`gpu_id=eq.${enc(f.gpuId)}`);
   if (f.resolution) q.push(`resolution=eq.${enc(f.resolution)}`);
+  if (f.preset) q.push(`preset=eq.${enc(f.preset)}`);
+  if (f.rayTracing !== undefined) q.push(`ray_tracing=is.${f.rayTracing}`);
+  if (f.frameGen !== undefined) q.push(`frame_gen=is.${f.frameGen}`);
   if (f.sourceId) q.push(`source_id=eq.${enc(f.sourceId)}`);
   // NULL source ids are kept (NOT IN alone would drop them).
   if (f.excludeSources?.length) q.push(`or=(source_id.is.null,source_id.not.in.(${f.excludeSources.map((s) => enc(s.replace(/[^a-z0-9_-]/gi, ""))).join(",")}))`);
   if (f.verification && f.verification !== "any") q.push(`verification_status=eq.${enc(f.verification)}`);
+  return q.join("&");
+}
+
+function browserToRow(r: StoredBrowserResult): Row {
+  return {
+    id: r.id,
+    test_version: r.version,
+    backend: r.backend,
+    preset: r.preset,
+    mode: r.mode,
+    render_width: r.width,
+    render_height: r.height,
+    frames: r.frames,
+    batches: r.batches,
+    duration_ms: Math.round(r.durationMs),
+    wall_ms: Math.round(r.wallMs),
+    median_fps: r.medianFps,
+    mean_fps: r.meanFps,
+    p1_low_fps: r.p1LowFps,
+    median_frame_ms: r.medianFrameMs,
+    cv: r.cv,
+    drift: r.drift,
+    window_fps: r.windowFps,
+    issues: r.issues,
+    anomaly_flags: r.anomalies,
+    software_renderer: r.software,
+    gpu_renderer: r.gpuRenderer,
+    browser: r.browser,
+    os: r.os,
+    logical_cores: r.logicalCores,
+    status: r.status,
+    fingerprint: r.fingerprint,
+    submitted_by: r.submittedBy,
+  };
+}
+
+function browserFromRow(x: Row): StoredBrowserResult {
+  const arr = (v: unknown) => (Array.isArray(v) ? v : []);
+  const optNum = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+  return {
+    id: String(x.id),
+    version: String(x.test_version),
+    backend: x.backend as StoredBrowserResult["backend"],
+    preset: x.preset as StoredBrowserResult["preset"],
+    mode: x.mode as StoredBrowserResult["mode"],
+    width: Number(x.render_width),
+    height: Number(x.render_height),
+    frames: Number(x.frames),
+    batches: Number(x.batches),
+    durationMs: Number(x.duration_ms),
+    wallMs: Number(x.wall_ms),
+    medianFps: Number(x.median_fps),
+    meanFps: Number(x.mean_fps),
+    p1LowFps: Number(x.p1_low_fps),
+    medianFrameMs: Number(x.median_frame_ms),
+    cv: Number(x.cv),
+    drift: optNum(x.drift),
+    windowFps: arr(x.window_fps).map(Number),
+    issues: arr(x.issues).map(String),
+    anomalies: arr(x.anomaly_flags).map(String),
+    software: Boolean(x.software_renderer),
+    gpuRenderer: str(x.gpu_renderer) ?? null,
+    browser: str(x.browser) ?? null,
+    os: str(x.os) ?? null,
+    logicalCores: optNum(x.logical_cores),
+    status: x.status as StoredBrowserResult["status"],
+    createdAt: String(x.created_at),
+    fingerprint: String(x.fingerprint),
+    submittedBy: str(x.submitted_by) ?? null,
+    reviewedBy: str(x.reviewed_by) ?? null,
+    reviewedAt: str(x.reviewed_at) ?? null,
+  };
+}
+
+function browserFilterQuery(f: BrowserResultFilter) {
+  const q: string[] = [];
+  if (f.version) q.push(`test_version=eq.${enc(f.version)}`);
+  if (f.preset) q.push(`preset=eq.${enc(f.preset)}`);
+  if (f.backend) q.push(`backend=eq.${enc(f.backend)}`);
+  if (f.mode) q.push(`mode=eq.${enc(f.mode)}`);
+  if (f.submittedBy) q.push(`submitted_by=eq.${enc(f.submittedBy)}`);
+  if (f.status === "public") q.push("status=neq.rejected");
+  else if (f.status && f.status !== "any") q.push(`status=eq.${enc(f.status)}`);
   return q.join("&");
 }
 
@@ -390,7 +563,11 @@ export function createSupabaseStore(baseUrl: string, secretKey: string): Benchma
       const body = (await res.json().catch(() => ({}))) as { code?: string };
       // Map PostgREST/Postgres codes to safe messages; never echo the raw response.
       if (body.code === "PGRST205" || body.code === "42703" || body.code === "42P01") {
-        throw new StoreError("Схема базы не обновлена: примените миграцию supabase/migrations/20261015000000_fps_data_engine.sql.");
+        throw new StoreError(
+          path.startsWith("browser_benchmark_results")
+            ? "Публикация браузерных результатов не настроена: примените миграцию supabase/migrations/20261016000000_browser_benchmarks.sql."
+            : "Схема базы не обновлена: примените миграцию supabase/migrations/20261015000000_fps_data_engine.sql.",
+        );
       }
       if (body.code === "23505") throw new StoreError("Такая запись уже есть в базе (дубликат).", 409);
       if (body.code === "23503") throw new StoreError("Запись ссылается на отсутствующую игру или комплектующее.", 422);
@@ -509,6 +686,7 @@ export function createSupabaseStore(baseUrl: string, secretKey: string): Benchma
       if (patch.verification !== undefined) {
         row.verification_status = patch.verification;
         row.verified_at = patch.verification === "verified" ? new Date().toISOString() : null;
+        row.verified_by = patch.verification === "verified" ? (patch.reviewedBy ?? null) : null;
       }
       const rows = await json<Row[]>(await call(`benchmark_records?id=eq.${id}`, { method: "PATCH", body: JSON.stringify(row), prefer: "return=representation" }));
       return rows[0] ? fromRow(rows[0]) : null;
@@ -557,6 +735,43 @@ export function createSupabaseStore(baseUrl: string, secretKey: string): Benchma
         updateMode: (x.update_mode as SourceState["updateMode"]) ?? "manual",
         notes: str(x.notes) ?? null,
       }));
+    },
+    async dataVersion() {
+      // Verified count + total rows (deletes) + latest updated_at (edits, verification; set by the touch_updated_at trigger).
+      const count = async (q: string) => Number((await call(`benchmark_records?select=id${q}`, { range: "0-0", prefer: "count=exact" })).headers.get("content-range")?.split("/")[1] ?? 0) || 0;
+      const [verified, total] = await Promise.all([count("&verification_status=eq.verified"), count("")]);
+      const latest = await json<Row[]>(await call("benchmark_records?select=updated_at&order=updated_at.desc.nullslast&limit=1"));
+      return `${verified}|${total}|${String(latest[0]?.updated_at ?? "")}`;
+    },
+    async insertBrowserResult(r) {
+      try {
+        await call("browser_benchmark_results", { method: "POST", body: JSON.stringify(browserToRow(r)), prefer: "return=minimal" });
+        return true;
+      } catch (e) {
+        // The unique (submitted_by, fingerprint) index caught a duplicate.
+        if (e instanceof StoreError && e.status === 409) return false;
+        throw e;
+      }
+    },
+    async listBrowserResults(filter, page = 1, pageSize = 50) {
+      const size = Math.min(100, Math.max(1, pageSize));
+      const from = (page - 1) * size;
+      const q = browserFilterQuery(filter);
+      const res = await call(`browser_benchmark_results?select=*${q ? `&${q}` : ""}&order=created_at.desc`, { range: `${from}-${from + size - 1}`, prefer: "count=exact" });
+      const total = Number(res.headers.get("content-range")?.split("/")[1] ?? 0);
+      return { items: (await json<Row[]>(res)).map(browserFromRow), total: Number.isFinite(total) ? total : 0, page, pageSize: size };
+    },
+    async countBrowserResults(filter) {
+      const q = browserFilterQuery(filter);
+      const res = await call(`browser_benchmark_results?select=id${q ? `&${q}` : ""}`, { range: "0-0", prefer: "count=exact" });
+      return Number(res.headers.get("content-range")?.split("/")[1] ?? 0) || 0;
+    },
+    async setBrowserResultStatus(id, status, reviewedBy) {
+      if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
+      const rows = await json<Row[]>(
+        await call(`browser_benchmark_results?id=eq.${id}`, { method: "PATCH", body: JSON.stringify({ status, reviewed_by: reviewedBy, reviewed_at: new Date().toISOString() }), prefer: "return=representation" }),
+      );
+      return rows[0] ? browserFromRow(rows[0]) : null;
     },
     async saveSourceState(s) {
       const row = {
@@ -644,6 +859,11 @@ export function createUnconfiguredStore(reason: string): BenchmarkStore {
     rollback: fail,
     sourceStates: fail,
     saveSourceState: fail,
+    insertBrowserResult: fail,
+    listBrowserResults: fail,
+    countBrowserResults: fail,
+    setBrowserResultStatus: fail,
+    dataVersion: fail,
   };
 }
 

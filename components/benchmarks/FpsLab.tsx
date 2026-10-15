@@ -5,6 +5,7 @@ import { usePrice } from "@/features/settings/currency";
 import { useMemo, useState } from "react";
 import { GAMES } from "@/data/games";
 import { useMeasuredBenchmarks } from "@/features/benchmarks/measured-store";
+import { splitLabRecords } from "@/features/benchmarks/records";
 import { requestInstall } from "@/features/build-state/install-action";
 import { useBuildDerived } from "@/features/build-state/derived";
 import { useSavedBuilds } from "@/features/build-state/saved-builds";
@@ -97,7 +98,9 @@ export function FpsLab() {
 
   const server = useVerifiedRecords([current.gpu?.id, alt?.gpu?.id]);
   const sources = useSourceStatuses();
-  const measured = [...ownRecords, ...server.records];
+  // Only verified records from the NexRig base go into the calculation. The user's own (local,
+  // unverified) records are shown next to it, never counted as a confirmed test.
+  const { forCalculation: measured, ownMatching } = splitLabRecords(ownRecords, server.records, { gameId: game.id, cpuId: current.cpu?.id, gpuId: current.gpu?.id, settings });
   const perfFor = (rig: Rig, g = game, s: GameSettings = settings) => getPerformance({ game: g, cpu: rig.cpu, gpu: rig.gpu, settings: s, measured, memory: rig.memory });
   const main = perfFor(current);
   const altMain = alt ? perfFor(alt) : null;
@@ -152,6 +155,14 @@ export function FpsLab() {
         </div>
       </header>
 
+      <Link href="/benchmark" className="flex flex-wrap items-center justify-between gap-2 rounded-[var(--radius-lg)] border border-violet/30 bg-violet-soft/30 px-4 py-3 text-[12.5px] hover:border-violet/50">
+        <span>
+          <span className="font-semibold">NexRig Benchmark</span>
+          <span className="text-fg-2"> — «Протестировать сборку»: анализ всех игр и разрешений с источниками; «Проверить этот компьютер»: реальный замер WebGPU/WebGL2 в браузере.</span>
+        </span>
+        <span className="text-violet">Открыть →</span>
+      </Link>
+
       <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
         <Panel>
           <SectionTitle aside={<Link href="/builder" className="text-[11px] text-violet hover:underline">Изменить</Link>}>Конфигурация</SectionTitle>
@@ -202,14 +213,27 @@ export function FpsLab() {
             <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-1">
               <dt className="text-fg-3">Источник</dt>
               <dd className="text-fg-2">
-                {provenance.dataSource ?? "—"}
-                {provenance.sourceUrl && (
-                  <>
-                    {" · "}
-                    <a href={provenance.sourceUrl} target="_blank" rel="noreferrer noopener" className="text-violet hover:underline">
-                      ссылка
-                    </a>
-                  </>
+                {provenance.sources.length === 0 ? (
+                  (provenance.dataSource ?? "—")
+                ) : (
+                  <ul className="space-y-0.5">
+                    {provenance.sources.map((s, i) => (
+                      <li key={`${s.url ?? s.label}-${s.date}-${i}`}>
+                        {s.url ? (
+                          <a href={s.url} target="_blank" rel="noreferrer noopener nofollow" className="text-violet hover:underline">
+                            {s.label}
+                          </a>
+                        ) : (
+                          s.label
+                        )}
+                        <span className="text-fg-3">
+                          {" "}
+                          · {s.date}
+                          {s.community ? " · замер пользователя, проверен" : ""}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
                 )}
               </dd>
               <dt className="text-fg-3">Дата теста</dt>
@@ -225,6 +249,19 @@ export function FpsLab() {
               ))}
             </ul>
             {server.error && <p className="text-[11px] text-warn">База NexRig недоступна ({server.error}) — расчёт без её замеров.</p>}
+            {ownMatching.length > 0 && (
+              <div className="rounded-[var(--radius-sm)] border border-dashed border-line p-2 text-[11.5px]">
+                <p className="font-medium text-fg-2">Ваши замеры этой конфигурации — не проверены, в расчёт не входят</p>
+                <ul className="mt-1 space-y-0.5 text-fg-3">
+                  {ownMatching.map((r) => (
+                    <li key={r.id}>
+                      {r.avgFps} FPS{r.low1Fps ? `, 1% low ${r.low1Fps}` : ""} · {r.testDate} · {r.source.label}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-1 text-fg-3">Отправьте замер на проверку в разделе ниже — после подтверждения администратором он попадёт в общую базу.</p>
+              </div>
+            )}
           </Panel>
           {bottleneckAdvice && (
             <Panel className="text-[12.5px] leading-relaxed text-fg-2">

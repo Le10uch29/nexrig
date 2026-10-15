@@ -162,7 +162,7 @@ export function Switch({ checked, onChange, label, disabled }: { checked: boolea
       >
         <span
           className={cx(
-            "absolute top-[2px] size-3 rounded-full bg-white transition-transform duration-150",
+            "absolute top-[2px] left-0 size-3 rounded-full bg-white transition-transform duration-150",
             checked ? "translate-x-[15px]" : "translate-x-[2px]",
           )}
         />

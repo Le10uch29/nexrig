@@ -16,6 +16,7 @@ export const ru = {
   nav: {
     builder: "Сборка ПК",
     games: "FPS Lab",
+    benchmark: "Benchmark",
     upgrade: "Апгрейд",
     expert: "AI-эксперт",
     database: "База железа",

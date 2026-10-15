@@ -48,6 +48,7 @@ export function freezeBuild(args: {
       ram: ram ? { type: ram.type, speedMtps: ram.speedMtps, modules: resolved.ramCount, moduleGb: ram.moduleSizeGb } : undefined,
       settings: testSettings,
       buildVersion: version,
+      selection,
     },
     buildName,
     version,

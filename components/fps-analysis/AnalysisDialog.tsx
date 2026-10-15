@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useAnalysis, type AnalysisRun } from "@/features/fps-analysis/store";
-import { ANALYSIS_LEVEL_LABEL, ANALYSIS_RESOLUTIONS, TIER_LABEL, type GameReport, type ResolutionResult, type TestMatch } from "@/lib/fps-engine/analysis";
+import { ANALYSIS_LEVEL_LABEL, ANALYSIS_RESOLUTIONS, PROVENANCE_LABEL, TIER_LABEL, type GameReport, type Range, type ResolutionResult, type TestMatch, type VariantValue } from "@/lib/fps-engine/analysis";
 import { ANALYSIS_STAGES, STAGE_STATUS_LABEL, type StageStatus } from "@/lib/fps-engine/analysis-stages";
 import type { FpsConfidenceLevel, Resolution } from "@/types/benchmark";
 import { IconAlert, IconCheck, IconX } from "@/components/ui/icons";
@@ -106,7 +106,8 @@ function ResultsTable({ games, selected, onSelect }: { games: GameReport[]; sele
                       <RangeText r={r} />
                       <span className="mt-0.5 flex items-center gap-1.5 text-[10.5px]">
                         <span className={cx("size-1.5 rounded-full", LEVEL_STYLE[r.level].dot)} aria-hidden />
-                        <span className={LEVEL_STYLE[r.level].text}>{ANALYSIS_LEVEL_LABEL[r.level]}</span>
+                        <span className={LEVEL_STYLE[r.level].text}>{r.provenance ? PROVENANCE_LABEL[r.provenance] : ANALYSIS_LEVEL_LABEL[r.level]}</span>
+                        {r.testsUsed > 0 && <span className="num text-fg-3">· тестов {r.testsUsed}</span>}
                         {r.low1 && <span className="num text-fg-3">· 1% low {r.low1.low === r.low1.high ? r.low1.mid : `${r.low1.low}–${r.low1.high}`}</span>}
                       </span>
                     </button>
@@ -130,6 +131,8 @@ function TestCard({ t }: { t: TestMatch }) {
           Уровень {t.tier}: {TIER_LABEL[t.tier]}
         </span>
         {t.source.community && <Badge tone="violet">замер пользователя</Badge>}
+        {t.stale && <Badge tone="warn">устаревший</Badge>}
+        <span className="num text-fg-3">соответствие {t.matchScore}%</span>
       </div>
       {!t.used && t.excludedReason && <p className="mt-1 text-warn">Причина: {t.excludedReason}</p>}
       <dl className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-2">
@@ -150,7 +153,7 @@ function TestCard({ t }: { t: TestMatch }) {
         <div>
           <dt className="text-fg-3">Тестовый стенд</dt>
           <dd>
-            {t.testSystem.cpu} + {t.testSystem.gpu}
+            {t.testSystem.game}: {t.testSystem.cpu} + {t.testSystem.gpu}
             {t.testSystem.ram && `, ${t.testSystem.ram}`}
             <span className="block text-fg-3">{t.testSystem.settings}</span>
             {t.testSystem.config && <span className="block text-fg-3">{t.testSystem.config}</span>}
@@ -188,6 +191,36 @@ function TestCard({ t }: { t: TestMatch }) {
   );
 }
 
+const rangeText = (a: Range | null) => (a ? (a.low === a.high ? String(a.mid) : `${a.low}–${a.high}`) : "—");
+
+function VariantCell({ v }: { v: VariantValue }) {
+  return (
+    <div className="rounded-[var(--radius-sm)] border border-line px-2 py-1.5">
+      <p className="text-fg-3">{v.label}</p>
+      <p className="num font-semibold">{rangeText(v.avg)}</p>
+      <p className="text-[10.5px] text-fg-3">{v.provenance ? PROVENANCE_LABEL[v.provenance] : "нет данных"}{v.testsUsed ? ` · тестов ${v.testsUsed}` : ""}</p>
+    </div>
+  );
+}
+
+/** Same build and resolution with other settings — each value with its own provenance. */
+function VariantsView({ r }: { r: ResolutionResult }) {
+  const v = r.variants!;
+  return (
+    <div className="text-[11.5px]">
+      <h4 className="mb-1.5 text-[11px] font-semibold tracking-wide text-fg-3 uppercase">Другие настройки · {r.resolution}</h4>
+      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-6">
+        {v.presets.map((p) => (
+          <VariantCell key={p.preset} v={p} />
+        ))}
+        {v.rayTracing && <VariantCell v={v.rayTracing} />}
+        {v.frameGen && <VariantCell v={v.frameGen} />}
+      </div>
+      <p className="mt-1 text-[10.5px] text-fg-3">Пресеты — при остальных выбранных настройках. Значения с генерацией кадров — показанный FPS, их нельзя сравнивать с обычным.</p>
+    </div>
+  );
+}
+
 function Details({ game, r }: { game: GameReport; r: ResolutionResult }) {
   return (
     <section className="space-y-3 rounded-[var(--radius-md)] border border-line p-3" aria-label={`${game.title}, ${r.resolution}`}>
@@ -197,7 +230,7 @@ function Details({ game, r }: { game: GameReport; r: ResolutionResult }) {
         </h3>
         <span className="flex items-center gap-1.5 text-[11.5px]">
           <span className={cx("size-1.5 rounded-full", LEVEL_STYLE[r.level].dot)} aria-hidden />
-          <span className={LEVEL_STYLE[r.level].text}>{ANALYSIS_LEVEL_LABEL[r.level]}</span>
+          <span className={LEVEL_STYLE[r.level].text}>{ANALYSIS_LEVEL_LABEL[r.level]}{r.provenance ? ` (${PROVENANCE_LABEL[r.provenance]})` : ""}</span>
           {r.confidence && <span className="text-fg-3">· уверенность {CONFIDENCE_LABEL[r.confidence]}</span>}
         </span>
       </div>
@@ -226,6 +259,7 @@ function Details({ game, r }: { game: GameReport; r: ResolutionResult }) {
           <li key={x}>{x}</li>
         ))}
       </ul>
+      {r.variants && <VariantsView r={r} />}
       {r.tests.length > 0 && (
         <div>
           <h4 className="mb-1.5 text-[11px] font-semibold tracking-wide text-fg-3 uppercase">Похожие тестовые системы</h4>
@@ -323,7 +357,7 @@ export function AnalysisDialog() {
   const cell = game?.results.find((r) => r.resolution === res);
 
   return (
-    <Dialog open={open} onClose={() => setOpen(false)} title="Тест производительности ПК" className="max-h-[calc(100dvh-24px)] w-[min(1120px,calc(100vw-16px))] overflow-auto">
+    <Dialog open={open} onClose={() => setOpen(false)} title="NexRig Benchmark · тест сборки" className="max-h-[calc(100dvh-24px)] w-[min(1120px,calc(100vw-16px))] overflow-auto">
       <div className="space-y-4">
         {frozen && (
           <div className="rounded-[var(--radius-md)] border border-line bg-panel-2/40 p-3">
@@ -360,6 +394,9 @@ export function AnalysisDialog() {
               )}
               <Link href="/games" className="inline-flex h-7 items-center rounded-[var(--radius-sm)] px-2.5 text-xs text-fg-2 hover:bg-panel-2 hover:text-fg">
                 Открыть FPS Lab
+              </Link>
+              <Link href="/benchmark" onClick={() => setOpen(false)} className="inline-flex h-7 items-center rounded-[var(--radius-sm)] px-2.5 text-xs text-fg-2 hover:bg-panel-2 hover:text-fg">
+                NexRig Benchmark
               </Link>
             </div>
             {status === "cancelled" && <p className="text-[12px] text-fg-3">Анализ отменён.</p>}
@@ -434,8 +471,15 @@ export function AnalysisDialog() {
                         {run.report.sourcesUsed.length ? (
                           <ul className="space-y-1">
                             {run.report.sourcesUsed.map((s) => (
-                              <li key={s.label}>
-                                {s.label} <span className="text-fg-3">· тестов {s.tests}</span>
+                              <li key={s.url ?? s.label}>
+                                {s.url ? (
+                                  <a href={s.url} target="_blank" rel="noopener noreferrer nofollow" className="text-violet hover:underline">
+                                    {s.label}
+                                  </a>
+                                ) : (
+                                  s.label
+                                )}{" "}
+                                <span className="text-fg-3">· тестов {s.tests}</span>
                               </li>
                             ))}
                           </ul>

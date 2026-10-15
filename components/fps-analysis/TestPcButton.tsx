@@ -46,7 +46,7 @@ export function TestPcButton() {
           )}
         >
           <IconGauge className={running ? "animate-pulse" : undefined} />
-          {running ? "Идёт анализ…" : "Протестировать ПК"}
+          {running ? "Идёт анализ…" : "Протестировать сборку"}
         </button>
         {!ready && (
           <p id="test-pc-missing" className="rounded-[var(--radius-sm)] bg-panel/85 px-2 py-1 text-center text-[11px] leading-snug text-fg-3 backdrop-blur">

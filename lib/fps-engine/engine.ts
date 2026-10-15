@@ -1,7 +1,7 @@
 import { GAMES } from "@/data/games";
 import { getPerformance, memoryOf, MODEL_VERSION, type MemoryConfig } from "@/lib/benchmark-engine/estimate";
 import { hardwareRepository } from "@/lib/hardware/repository";
-import type { BenchmarkRecord, FpsConfidenceLevel, FpsEstimate, Game, GameSettings, PerformanceResult } from "@/types/benchmark";
+import type { BenchmarkRecord, EstimateSource, FpsConfidenceLevel, FpsEstimate, Game, GameSettings, PerformanceResult } from "@/types/benchmark";
 import type { CpuSpec, GpuSpec } from "@/types/hardware";
 
 /**
@@ -34,6 +34,11 @@ export interface FpsInput {
   records: BenchmarkRecord[];
 }
 
+const sourcesOf = (records: BenchmarkRecord[]): EstimateSource[] =>
+  [...records]
+    .sort((a, b) => b.testDate.localeCompare(a.testDate))
+    .map((r) => ({ label: r.source.label, url: r.source.url ?? null, date: r.testDate, community: Boolean(r.community || r.submittedBy) }));
+
 const latest = (records: BenchmarkRecord[]) => [...records].sort((a, b) => b.testDate.localeCompare(a.testDate))[0];
 
 export function toFpsEstimate(result: PerformanceResult, game: Game | undefined): FpsEstimate {
@@ -49,6 +54,7 @@ export function toFpsEstimate(result: PerformanceResult, game: Game | undefined)
       confidenceReasons: [result.reason],
       dataSource: null,
       sourceUrl: null,
+      sources: [],
       benchmarkDate: null,
       gameVersion: game?.version ?? null,
       calculationMethod: "—",
@@ -78,6 +84,7 @@ export function toFpsEstimate(result: PerformanceResult, game: Game | undefined)
       ],
       dataSource: sources.join(", "),
       sourceUrl: ref.source.url ?? null,
+      sources: sourcesOf(result.records),
       benchmarkDate: ref.testDate,
       gameVersion: ref.gameVersion ?? null,
       calculationMethod: ref.method ?? "Среднее по замерам",
@@ -101,6 +108,7 @@ export function toFpsEstimate(result: PerformanceResult, game: Game | undefined)
       : ["Замеров для этой конфигурации нет — оценка по модели относительной производительности.", "Диапазон ±25% — типичная ошибка модели, а не разброс измерений."],
     dataSource: calibrated ? "Модель + близкие замеры" : "Модель NexRig",
     sourceUrl: null,
+    sources: calibrated ? sourcesOf(result.anchors) : [],
     benchmarkDate: null,
     gameVersion: game?.version ?? null,
     calculationMethod: result.method,

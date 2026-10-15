@@ -15,7 +15,8 @@ const MIN_TOKEN = 24;
 
 const digest = (s: string) => createHash("sha256").update(s).digest();
 
-export type AdminCheck = { ok: true; via: "token" | "session" } | { ok: false; response: Response };
+/** userId: the signed-in admin (null for the script token, which has no user). */
+export type AdminCheck = { ok: true; via: "token" | "session"; userId: string | null } | { ok: false; response: Response };
 
 const deny = (status: number, error: string): AdminCheck => ({ ok: false, response: Response.json({ error }, { status }) });
 
@@ -32,7 +33,7 @@ export function sameOrigin(request: Request) {
   }
 }
 
-export async function requireAdmin(request: Request, getUser: () => Promise<{ isAdmin: boolean } | null> = defaultSessionUser): Promise<AdminCheck> {
+export async function requireAdmin(request: Request, getUser: () => Promise<{ isAdmin: boolean; id?: string } | null> = defaultSessionUser): Promise<AdminCheck> {
   const expected = process.env.NEXRIG_ADMIN_TOKEN;
   const tokenConfigured = Boolean(expected && expected.length >= MIN_TOKEN);
   const header = request.headers.get("authorization") ?? "";
@@ -42,14 +43,14 @@ export async function requireAdmin(request: Request, getUser: () => Promise<{ is
   if (token) {
     if (!tokenConfigured) return deny(503, "Вход по токену не настроен на сервере.");
     // Compare fixed-length digests in constant time.
-    return timingSafeEqual(digest(token), digest(expected!)) ? { ok: true, via: "token" } : deny(401, "Нет прав администратора.");
+    return timingSafeEqual(digest(token), digest(expected!)) ? { ok: true, via: "token", userId: null } : deny(401, "Нет прав администратора.");
   }
 
   const user = await getUser().catch(() => null);
   if (!user) return authConfiguredOnServer() || tokenConfigured ? deny(401, "Войдите как администратор.") : deny(503, "Администрирование не настроено на сервере.");
   if (!user.isAdmin) return deny(403, "Недостаточно прав: нужна роль администратора.");
   if (request.method !== "GET" && request.method !== "HEAD" && !sameOrigin(request)) return deny(403, "Запрос отклонён: другой источник (Origin).");
-  return { ok: true, via: "session" };
+  return { ok: true, via: "session", userId: user.id ?? null };
 }
 
 function authConfiguredOnServer() {

@@ -2,16 +2,14 @@ import type { AnalysisReport } from "./analysis";
 
 /** Stages of the "Протестировать ПК" run, shared by the API stream and the UI. */
 export const ANALYSIS_STAGES = [
-  { id: "freeze", label: "Фиксация конфигурации" },
-  { id: "sources", label: "Проверка источников" },
-  { id: "exact", label: "Точные тесты этой сборки" },
-  { id: "gpu", label: "Тесты этой видеокарты" },
-  { id: "cpu", label: "Тесты этого процессора" },
-  { id: "similar", label: "Похожие системы и другие тесты игр" },
-  { id: "normalize", label: "Сопоставление методик и настроек" },
-  { id: "transfer", label: "Перенос результатов на вашу сборку" },
-  { id: "reconcile", label: "Выбросы и согласованность" },
-  { id: "report", label: "Расчёт FPS и отчёт" },
+  { id: "build", label: "Проверка выбранной сборки" },
+  { id: "compat", label: "Проверка совместимости" },
+  { id: "sources", label: "Поиск доступных источников" },
+  { id: "similar", label: "Подбор похожих конфигураций" },
+  { id: "normalize", label: "Нормализация настроек" },
+  { id: "ranges", label: "Расчёт диапазонов FPS" },
+  { id: "reliability", label: "Проверка достоверности" },
+  { id: "report", label: "Формирование отчёта" },
 ] as const;
 
 export type StageId = (typeof ANALYSIS_STAGES)[number]["id"];

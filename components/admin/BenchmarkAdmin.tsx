@@ -7,6 +7,7 @@ import { IMPORTABLE_SOURCE_IDS } from "@/lib/fps-engine/catalog";
 import { hardwareRepository } from "@/lib/hardware/repository";
 import type { BenchmarkRecord, VerificationStatus } from "@/types/benchmark";
 import { Badge, Button, cx, EmptyState, Field, inputCls, SectionTitle, Select } from "@/components/ui/primitives";
+import { BrowserResultsSection } from "./BrowserResultsAdmin";
 import { SourcesSection } from "./SourcesAdmin";
 
 /**
@@ -154,6 +155,7 @@ export function BenchmarkAdmin() {
         </p>
       )}
       <SourcesSection api={api} />
+      <BrowserResultsSection api={api} />
       <RecordsSection api={api} />
       <ImportSection api={api} />
       <AddSection api={api} />
@@ -169,7 +171,7 @@ function Panel({ children }: { children: React.ReactNode }) {
 }
 
 function RecordsSection({ api }: { api: Api }) {
-  const [filter, setFilter] = useState({ gameId: "", gpuId: "", resolution: "", sourceId: "", verification: "any" });
+  const [filter, setFilter] = useState({ gameId: "", gpuId: "", cpuId: "", resolution: "", preset: "", rayTracing: "", frameGen: "", sourceId: "", verification: "any" });
   const [page, setPage] = useState(1);
   const [data, setData] = useState<{ items: BenchmarkRecord[]; total: number; pageSize: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -214,8 +216,20 @@ function RecordsSection({ api }: { api: Api }) {
         <Field label="GPU (id)">
           <input className={inputCls} value={filter.gpuId} onChange={(e) => (setPage(1), setFilter({ ...filter, gpuId: e.target.value.trim() }))} placeholder="nvidia-founders-edition-rtx-4070" />
         </Field>
+        <Field label="CPU (id)">
+          <input className={inputCls} value={filter.cpuId} onChange={(e) => (setPage(1), setFilter({ ...filter, cpuId: e.target.value.trim() }))} placeholder="amd-ryzen-7-7800x3d" />
+        </Field>
         <Field label="Разрешение">
           <Select label="Разрешение" value={filter.resolution} onChange={(resolution) => (setPage(1), setFilter({ ...filter, resolution }))} options={[{ value: "", label: "все" }, ...["1080p", "1440p", "4K"].map((v) => ({ value: v, label: v }))]} />
+        </Field>
+        <Field label="Пресет">
+          <Select label="Пресет" value={filter.preset} onChange={(preset) => (setPage(1), setFilter({ ...filter, preset }))} options={[{ value: "", label: "все" }, ...["low", "medium", "high", "ultra"].map((v) => ({ value: v, label: v }))]} />
+        </Field>
+        <Field label="Ray tracing">
+          <Select label="Ray tracing" value={filter.rayTracing} onChange={(rayTracing) => (setPage(1), setFilter({ ...filter, rayTracing }))} options={[{ value: "", label: "все" }, { value: "true", label: "RT вкл." }, { value: "false", label: "RT выкл." }]} />
+        </Field>
+        <Field label="Генерация кадров">
+          <Select label="Генерация кадров" value={filter.frameGen} onChange={(frameGen) => (setPage(1), setFilter({ ...filter, frameGen }))} options={[{ value: "", label: "все" }, { value: "true", label: "FG вкл." }, { value: "false", label: "FG выкл." }]} />
         </Field>
         <Field label="Источник">
           <Select label="Источник" value={filter.sourceId} onChange={(sourceId) => (setPage(1), setFilter({ ...filter, sourceId }))} options={[{ value: "", label: "все" }, ...SOURCES.map((v) => ({ value: v, label: v }))]} />

@@ -36,6 +36,9 @@ export const listQuerySchema = z.object({
   cpuId: id.optional(),
   gpuId: id.optional(),
   resolution: z.enum(["1080p", "1440p", "4K"]).optional(),
+  preset: z.enum(["low", "medium", "high", "ultra"]).optional(),
+  rayTracing: z.enum(["true", "false"]).transform((v) => v === "true").optional(),
+  frameGen: z.enum(["true", "false"]).transform((v) => v === "true").optional(),
   sourceId: z.string().max(40).optional(),
   verification: z.enum(["unverified", "verified", "rejected", "any"]).optional(),
 });

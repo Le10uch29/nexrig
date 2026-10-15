@@ -1,8 +1,6 @@
-import type { Metadata } from "next";
-import { ExpertView } from "@/components/ai/ExpertView";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "AI-эксперт" };
-
+// The AI expert is switched off for now (components/ai/ExpertView.tsx is kept); old links lead to the builder.
 export default function ExpertPage() {
-  return <ExpertView />;
+  redirect("/builder");
 }
