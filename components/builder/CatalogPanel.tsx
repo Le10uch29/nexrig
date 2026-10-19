@@ -15,6 +15,7 @@ import { ComponentCard } from "@/components/hardware/ComponentCard";
 import { ComponentThumb } from "@/components/hardware/ComponentThumb";
 import { IconChevron, IconSearch } from "@/components/ui/icons";
 import { Button, cx, EmptyState, inputCls, Select, Switch } from "@/components/ui/primitives";
+import { FanLayoutEditor } from "./FanLayoutEditor";
 
 type Sort = "price-asc" | "price-desc" | "perf" | "newest" | "name";
 const PAGE = 30;
@@ -200,6 +201,7 @@ export function CatalogPanel() {
 
       <div className="scroll-thin min-h-0 flex-1 space-y-2 overflow-y-auto p-3">
         {category === "ram" && <RamQuantity />}
+        {category === "fans" && <FanLayoutEditor />}
 
         {atStep ? (
           <section aria-label={facets[stepIndex].label} className="animate-in space-y-2.5">

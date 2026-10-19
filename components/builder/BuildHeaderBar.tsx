@@ -40,9 +40,13 @@ export function BuildHeaderBar() {
   const fpsValue = fps ? (fps.averageFpsEstimate ?? fps.frameGenFps) : null;
 
   return (
-    <header className="@container border-b border-line bg-[linear-gradient(180deg,var(--panel)_0%,var(--bg-1)_100%)] px-4 py-3 lg:px-5" aria-label="Состояние сборки">
+    <header
+      className="@container relative z-20 border-b border-line bg-bg-1 px-4 py-3 lg:pointer-events-none lg:absolute lg:inset-x-0 lg:top-0 lg:border-0 lg:bg-transparent lg:px-6 lg:pt-4 lg:pb-0"
+      aria-label="Состояние сборки"
+    >
       <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
-        <div className="min-w-0 flex-1 basis-64">
+        <div className="min-w-0 flex-1 basis-64 lg:pointer-events-auto lg:max-w-[540px]">
+          <p className="px-1 text-[11px] font-semibold tracking-[0.14em] text-violet uppercase">Конструктор</p>
           <label htmlFor="build-name" className="sr-only">
             Название сборки
           </label>
@@ -51,7 +55,7 @@ export function BuildHeaderBar() {
             value={buildName}
             onChange={(e) => setBuildName(e.target.value)}
             maxLength={120}
-            className="w-full truncate rounded-[var(--radius-sm)] border border-transparent bg-transparent px-1 py-0.5 text-[20px] font-semibold tracking-tight outline-none hover:border-line focus:border-violet/60"
+            className="w-full truncate rounded-[var(--radius-sm)] border border-transparent bg-transparent px-1 py-0.5 text-[20px] font-semibold tracking-tight outline-none hover:border-line focus:border-violet/60 lg:text-[24px]"
           />
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[12.5px]">
             <span className="flex items-center gap-2 text-fg-3">
@@ -70,7 +74,7 @@ export function BuildHeaderBar() {
           </div>
         </div>
 
-        <dl className="flex flex-wrap items-center gap-x-8 gap-y-2">
+        <dl className="flex flex-wrap items-center gap-x-8 gap-y-2 lg:pointer-events-auto lg:mx-auto lg:rounded-[var(--radius-xl)] lg:border lg:border-line lg:bg-bg-0/65 lg:px-6 lg:py-2.5 lg:backdrop-blur-md">
           <div>
             <dt className="eyebrow">Стоимость</dt>
             <dd className="num text-[24px] leading-tight font-semibold">{formatPrice(total)}</dd>
@@ -82,7 +86,7 @@ export function BuildHeaderBar() {
             <dd>
               <button type="button" onClick={() => openSection("perf")} className="flex items-baseline gap-1.5 text-left" title="Открыть FPS и производительность">
                 <span className="num text-[24px] leading-tight font-semibold text-cyan">{fpsValue !== null ? `${fps?.level === "verified" ? "" : "~"}${fpsValue}` : "—"}</span>
-                <span className="text-[12px] text-fg-3">{fps ? LEVEL_LABEL[fps.level].toLowerCase() : "нужны CPU и GPU"}</span>
+                <span className="text-[12px] text-fg-3">{fps ? LEVEL_LABEL[fps.level].toLowerCase() : !resolved.cpu && !resolved.gpu ? "нужны CPU и GPU" : !resolved.gpu ? "нужна видеокарта" : "нужен процессор"}</span>
               </button>
             </dd>
           </div>
@@ -95,7 +99,7 @@ export function BuildHeaderBar() {
           </div>
         </dl>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 lg:pointer-events-auto">
           <TestPcButton />
           <Button
             variant="secondary"

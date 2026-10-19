@@ -47,6 +47,17 @@ function radiatorBox(sizeMm: number): Box {
   return { min: [-0.395, -len / 2, -w], max: [0.14, len / 2, w] };
 }
 
+/** World box of a radiator: rotated about z (front/top/bottom), or about y by +90° (side strip of glass-front cases). */
+function radiatorWorldBox(sizeMm: number, rotation: Vec3, at: Vec3): Box {
+  const local = radiatorBox(sizeMm);
+  if (rotation[1] === 0) return rotatedZ(local, rotation[2], at);
+  // Ry(+90°): (x, y, z) → (z, y, -x)
+  return {
+    min: [at[0] + local.min[2], at[1] + local.min[1], at[2] - local.max[0]],
+    max: [at[0] + local.max[2], at[1] + local.max[1], at[2] - local.min[0]],
+  };
+}
+
 function fanBox(at: Vec3, rotation: Vec3, size: number): Box {
   const half: Vec3 = rotation[1] !== 0 ? [0.135, size / 2, size / 2] : rotation[0] !== 0 ? [size / 2, 0.135, size / 2] : [size / 2, size / 2, 0.135];
   return { min: [at[0] - half[0], at[1] - half[1], at[2] - half[2]], max: [at[0] + half[0], at[1] + half[1], at[2] + half[2]] };
@@ -67,7 +78,8 @@ describe("physical fit inside the case", () => {
     const fit = computeFit(resolveBuild({ ...DEFAULT_SELECTION, case: "lian-li-lancool-iii", cooler: "arctic-liquid-freezer-iii-360" }))!;
     expect(fit.radiator?.chosen?.position).toBe("top");
     expect(fit.radiator?.lengthMm).toBe(392);
-    expect(fit.radiator?.options.map((o) => o.position)).toEqual(RADIATOR_PREFERENCE.filter((p) => p === "top" || p === "front"));
+    // Front mounts are never used for radiators; the Lancool III has no side mount.
+    expect(fit.radiator?.options.map((o) => o.position)).toEqual(RADIATOR_PREFERENCE.filter((p) => p === "top"));
   });
 
   it("uses 140 mm fans on 280/420 radiators", () => {
@@ -90,7 +102,7 @@ describe("physical fit inside the case", () => {
             const rad = fit.radiator?.chosen;
             // Main chamber only: in front of the motherboard tray, inside the shell.
             const main: Box = { min: [box.min[0], box.min[1], Math.max(box.min[2], caseGeometry(c).trayZ)], max: box.max };
-            if (rad && !inside(rotatedZ(radiatorBox(aio.radiatorMm!), rad.pose.rotation[2], rad.pose.position), main)) failures.push(`radiator ${rad.position}: ${tag}`);
+            if (rad && !inside(radiatorWorldBox(aio.radiatorMm!, rad.pose.rotation, rad.pose.position), main)) failures.push(`radiator ${rad.position}: ${tag}`);
             for (const p of fit.fans?.poses ?? []) {
               if (!inside(fanBox(p.position, p.rotation, (b.fans?.sizeMm ?? 120) * MM), main)) failures.push(`fan: ${tag}`);
             }
@@ -115,14 +127,20 @@ describe("physical fit inside the case", () => {
     expect(failures).toEqual([]);
   });
 
-  it("parks a radiator that fits nowhere and explains why", () => {
-    // North: 360 only at the front, and a 304 mm card leaves no room for the radiator stack.
-    const sel = { ...DEFAULT_SELECTION, cooler: "arctic-liquid-freezer-iii-360", gpu: "nvidia-founders-edition-rtx-5090" };
+  it("parks a radiator that has no top or side mount and explains why", () => {
+    // North takes 360 mm only at the front, and radiators are not mounted at the front.
+    const sel = { ...DEFAULT_SELECTION, cooler: "arctic-liquid-freezer-iii-360" };
     const b = resolveBuild(sel);
-    const check = checkBuild(sel).checks.find((c) => c.rule === "radiator-fit")!;
+    const check = checkBuild(sel).checks.find((c) => c.rule === "radiator")!;
     expect(check.status).toBe("incompatible");
-    expect(check.detail).toMatch(/спереди мешает видеокарта 304 мм/);
+    expect(check.detail).toMatch(/сверху и сбоку корпус принимает сверху 240 мм/);
+    expect(computeFit(b)!.radiator?.chosen).toBeUndefined();
     expect(computePlacements(b, checkBuild(sel).checks).find((p) => p.key === "cooler")?.state).toBe("parked");
+  });
+
+  it("puts the radiator on the side when the top cannot take its size", () => {
+    const fit = computeFit(resolveBuild({ ...selectionFor(PC_CASES.find((c) => c.id === "hyte-y60")!), cooler: "arctic-liquid-freezer-iii-360" }))!;
+    expect(fit.radiator?.chosen?.position).toBe("side");
   });
 
   it("moves case fans off the front when a long GPU leaves no room, and warns", () => {

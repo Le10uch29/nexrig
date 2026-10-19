@@ -38,6 +38,7 @@ export const selectionSchema = z.object({
   storage: z.array(id).max(8),
   psu: id.nullable(),
   fans: id.nullable(),
+  fanLayout: z.partialRecord(z.enum(["front", "side", "top", "rear", "bottom"]), z.number().int().min(0).max(8)).nullable().optional(),
 });
 
 export const publishBuildSchema = z.object({

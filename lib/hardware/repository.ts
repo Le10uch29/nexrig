@@ -1,6 +1,6 @@
 import { ALL_COMPONENTS } from "@/components/PcComponents";
 import type { BuildSelection } from "@/types/build";
-import type { ComponentCategory, ComponentOf, HardwareComponent } from "@/types/hardware";
+import type { ComponentCategory, ComponentOf, FanLayout, FanPosition, HardwareComponent } from "@/types/hardware";
 
 /**
  * Read access to hardware data. The local implementation serves the bundled demo dataset;
@@ -59,6 +59,38 @@ export interface ResolvedBuild {
   storage: ComponentOf<"storage">[];
   psu?: ComponentOf<"psu">;
   fans?: ComponentOf<"fans">;
+  /** User's fans per position; absent = the whole pack, placed automatically. */
+  fanLayout?: FanLayout;
+}
+
+export const FAN_POSITIONS: FanPosition[] = ["front", "side", "top", "rear", "bottom"];
+export const MAX_FANS_PER_POSITION = 8;
+
+/** Valid per-position counts only; an all-zero or malformed layout means "automatic". */
+export function normalizeFanLayout(layout: unknown): FanLayout | undefined {
+  if (!layout || typeof layout !== "object") return undefined;
+  const out: FanLayout = {};
+  for (const p of FAN_POSITIONS) {
+    const n = (layout as Record<string, unknown>)[p];
+    if (typeof n === "number" && Number.isInteger(n) && n > 0 && n <= MAX_FANS_PER_POSITION) out[p] = n;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+export function fanLayoutTotal(layout: FanLayout | undefined) {
+  return layout ? FAN_POSITIONS.reduce((s, p) => s + (layout[p] ?? 0), 0) : 0;
+}
+
+/** Case fans installed: the layout's total, or the whole pack without a layout. */
+export function fanCountOf(b: Pick<ResolvedBuild, "fans" | "fanLayout">): number {
+  if (!b.fans) return 0;
+  return b.fanLayout ? fanLayoutTotal(b.fanLayout) : b.fans.count;
+}
+
+/** Packs to buy for the installed fans (the price in the catalog is per pack). */
+export function fanPacksOf(b: Pick<ResolvedBuild, "fans" | "fanLayout">): number {
+  if (!b.fans) return 0;
+  return Math.max(1, Math.ceil(fanCountOf(b) / Math.max(1, b.fans.count)));
 }
 
 /** Older saved builds have no ramCount; they were 2-module kits. */
@@ -76,7 +108,9 @@ function pick<C extends ComponentCategory>(
 }
 
 export function resolveBuild(selection: BuildSelection, repo: HardwareRepository = hardwareRepository): ResolvedBuild {
+  const fans = pick(repo, selection.fans, "fans");
   return {
+    fanLayout: fans ? normalizeFanLayout(selection.fanLayout) : undefined,
     case: pick(repo, selection.case, "case"),
     motherboard: pick(repo, selection.motherboard, "motherboard"),
     cpu: pick(repo, selection.cpu, "cpu"),
@@ -88,7 +122,7 @@ export function resolveBuild(selection: BuildSelection, repo: HardwareRepository
       .map((id) => pick(repo, id, "storage"))
       .filter((s): s is ComponentOf<"storage"> => Boolean(s)),
     psu: pick(repo, selection.psu, "psu"),
-    fans: pick(repo, selection.fans, "fans"),
+    fans,
   };
 }
 
@@ -107,7 +141,7 @@ export function selectedComponents(build: ResolvedBuild): HardwareComponent[] {
   return list.filter((c): c is HardwareComponent => Boolean(c));
 }
 
-/** Total demo price; memory is priced per module × ramCount. */
+/** Total demo price; memory is priced per module × ramCount, fans per pack × packs needed. */
 export function totalPrice(build: ResolvedBuild): number {
-  return selectedComponents(build).reduce((sum, c) => sum + c.price.amountRub * (c.category === "ram" ? build.ramCount : 1), 0);
+  return selectedComponents(build).reduce((sum, c) => sum + c.price.amountRub * (c.category === "ram" ? build.ramCount : c.category === "fans" ? fanPacksOf(build) : 1), 0);
 }

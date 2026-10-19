@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { Component, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useBuildDerived } from "@/features/build-state/derived";
 import { useBuildStore, type CaseMode } from "@/features/build-state/store";
+import { useModelPreviews } from "@/features/models/preview";
 import { useMessages } from "@/lib/i18n";
 import { IconAlert, IconChevron, IconExplode, IconHelp, IconLayers, IconReset, IconSidebar, IconSkip, IconTag, IconX } from "@/components/ui/icons";
 import { Button, cx, Segmented } from "@/components/ui/primitives";
@@ -71,7 +72,12 @@ function useWebGLStatus(): "checking" | "ok" | "unavailable" {
   );
 }
 
-export function SceneViewport() {
+/**
+ * `environment` picks the 3D surroundings (workshop or showroom). `toolbar` shows the built-in
+ * scene toolbar; `activity` the installation log and the imported-model banner. Pages with their
+ * own scene controls turn the toolbar off.
+ */
+export function SceneViewport({ environment = "workshop", toolbar = environment === "workshop", activity = environment === "workshop" }: { environment?: "workshop" | "studio"; toolbar?: boolean; activity?: boolean }) {
   const t = useMessages();
   const ref = useRef<HTMLDivElement>(null);
   const webgl = useWebGLStatus();
@@ -112,13 +118,37 @@ export function SceneViewport() {
             </div>
           )}
         >
-          <PcScene active={visible && pageVisible} reducedMotion={reducedMotion} />
+          <PcScene active={visible && pageVisible} reducedMotion={reducedMotion} environment={environment} />
         </SceneErrorBoundary>
       )}
       {webgl === "ok" && <SceneLabels />}
-      <SceneToolbar />
+      {toolbar && <SceneToolbar />}
       <MotionBanner />
-      <ActivityPanel />
+      {activity && <ActivityPanel />}
+      {activity && <PreviewBanner />}
+    </div>
+  );
+}
+
+/** Imported models attached from Studio: always visible here and removable in one click. */
+function PreviewBanner() {
+  const previews = useModelPreviews((s) => s.previews);
+  const detach = useModelPreviews((s) => s.detach);
+  const list = Object.values(previews);
+  if (list.length === 0) return null;
+  return (
+    <div className="absolute bottom-3 left-1/2 flex w-max max-w-[min(420px,calc(100%-24px))] -translate-x-1/2 flex-col gap-1.5 @max-xl:bottom-14" role="status">
+      {list.map((p) => (
+        <div key={p.key} className="glass flex items-center gap-2 rounded-[var(--radius-md)] py-1.5 pr-1.5 pl-3 text-[12px] shadow-[var(--shadow-panel)]">
+          <span className="size-2 shrink-0 rounded-full bg-violet" aria-hidden />
+          <span className="min-w-0 flex-1 truncate">
+            <span className="text-fg-3">Временная модель:</span> {p.fileName} → {p.componentName}
+          </span>
+          <Button size="sm" variant="ghost" onClick={() => detach(p.key)}>
+            Отключить
+          </Button>
+        </div>
+      ))}
     </div>
   );
 }

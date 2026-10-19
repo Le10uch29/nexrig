@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePrice } from "@/features/settings/currency";
 import { useBuildDerived } from "@/features/build-state/derived";
 import { useBuildStore } from "@/features/build-state/store";
+import { fanPacksOf } from "@/lib/hardware/repository";
 import { keySpecs } from "@/lib/hardware/specs";
 import { useMessages } from "@/lib/i18n";
 import { ColorSwatches } from "@/components/hardware/ColorSwatches";
@@ -26,7 +27,7 @@ function BuildDetails() {
   const formatPrice = usePrice();
   const t = useMessages();
   const { placements, resolved } = useBuildDerived();
-  const qty = (category: string) => (category === "ram" ? resolved.ramCount : 1);
+  const qty = (category: string) => (category === "ram" ? resolved.ramCount : category === "fans" ? fanPacksOf(resolved) : 1);
   const selectSlot = useBuildStore((s) => s.selectSlot);
   const selected = useBuildStore((s) => s.selectedSlot);
   const openCatalog = useBuildStore((s) => s.openCatalog);
@@ -96,7 +97,7 @@ export function InspectorPanel() {
   const current = nav.find((n) => n.id === inspector);
 
   return (
-    <section className="flex h-full min-h-0 flex-col bg-panel lg:border-l lg:border-line" aria-label={current?.label}>
+    <section className="flex h-full min-h-0 flex-col bg-panel lg:bg-transparent" aria-label={current?.label}>
       {/* One tab bar for every width: sections are always one click away. */}
       <div className="flex items-stretch border-b border-line">
         <HScroll className="min-w-0 flex-1" innerClassName="gap-0.5 px-2" role="tablist">

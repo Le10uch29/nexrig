@@ -8,6 +8,26 @@ import { cx } from "./primitives";
  * Pages compose these differently; the tokens (globals.css) keep them one system.
  */
 
+/** Square glass button for 3D-scene controls (view mode, explode, camera…). */
+export function ToolButton({ label, active, onClick, children, className }: { label: string; active?: boolean; onClick: () => void; children: ReactNode; className?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={label}
+      aria-label={label}
+      aria-pressed={active}
+      className={cx(
+        "grid size-10 place-items-center rounded-[var(--radius-md)] border backdrop-blur-md transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet",
+        active ? "border-violet/60 bg-violet/15 text-fg" : "border-line bg-bg-0/60 text-fg-2 hover:border-line-strong hover:text-fg",
+        className,
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
 /** Wide content area: uses the screen on desktop instead of a narrow centred column. */
 export function PageShell({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={cx("mx-auto w-full max-w-[1680px] px-4 py-6 md:px-8 md:py-8 xl:px-10", className)}>{children}</div>;

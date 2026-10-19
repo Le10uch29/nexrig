@@ -107,6 +107,17 @@ export interface CaseGeometry {
   boardOrigin: Vec3;
 }
 
+/**
+ * Feet under the case, by case type: rubber pads on tower cases, two long rails on panoramic
+ * "aquarium" cases, small round pads on compact cases. They hang below the case origin (y < 0);
+ * the scene lifts the build by `height` so the feet stand on the surface.
+ */
+export function caseFeet(c: CaseSpec): { kind: "pads" | "rails" | "round"; height: number } {
+  if (c.style === "glass-showcase") return { kind: "rails", height: 0.22 };
+  if (c.style === "compact") return { kind: "round", height: 0.1 };
+  return { kind: "pads", height: 0.15 };
+}
+
 export function caseGeometry(c: CaseSpec): CaseGeometry {
   const width = c.exteriorMm.width * MM;
   const height = c.exteriorMm.height * MM;

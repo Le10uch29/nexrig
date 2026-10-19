@@ -1,4 +1,4 @@
-import type { ComponentCategory } from "./hardware";
+import type { ComponentCategory, FanLayout } from "./hardware";
 
 /** Component ids selected for a build. Storage allows several drives. */
 export interface BuildSelection {
@@ -13,6 +13,11 @@ export interface BuildSelection {
   storage: string[];
   psu: string | null;
   fans: string | null;
+  /**
+   * Fans per mount position chosen by the user. Absent: the whole pack of `fans` is installed
+   * automatically in the case's preferred order (older saved builds behave this way).
+   */
+  fanLayout?: FanLayout | null;
 }
 
 export type SingleSlotCategory = Exclude<ComponentCategory, "storage">;

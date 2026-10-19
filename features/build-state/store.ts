@@ -3,12 +3,12 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { DEFAULT_BUILD_NAME, DEFAULT_SELECTION } from "@/data/default-build";
-import { hardwareRepository, normalizeRamCount } from "@/lib/hardware/repository";
+import { fanLayoutTotal, hardwareRepository, normalizeFanLayout, normalizeRamCount } from "@/lib/hardware/repository";
 import { getMessages } from "@/lib/i18n";
 import type { GameSettings } from "@/types/benchmark";
 import type { BuildSelection } from "@/types/build";
 import { EMPTY_SELECTION } from "@/types/build";
-import type { ComponentCategory, HardwareComponent } from "@/types/hardware";
+import type { ComponentCategory, FanLayout, HardwareComponent } from "@/types/hardware";
 
 export type InspectorView = "catalog" | "build" | "compat" | "perf" | "upgrade" | "saved" | "compare";
 export type CaseMode = "solid" | "glass" | "open";
@@ -45,7 +45,8 @@ interface BuildState {
   selectedSlot: string | null;
   hoveredSlot: string | null;
   /** leftPanel/rightPanel: builder side panels expanded (optional: older saved state lacks them). */
-  view: { exploded: boolean; caseMode: CaseMode; labels: boolean; leftPanel?: boolean; rightPanel?: boolean };
+  /** backdrop: showroom background — the hall photo (default) or the modelled hall. */
+  view: { exploded: boolean; caseMode: CaseMode; labels: boolean; leftPanel?: boolean; rightPanel?: boolean; backdrop?: "photo" | "hall" };
   motion: Record<string, MotionState>;
   activity: ActivityEntry[];
   skipNonce: number;
@@ -55,6 +56,8 @@ interface BuildState {
   setComponent: (component: HardwareComponent, opts?: { instant?: boolean; ramCount?: number }) => void;
   /** Change how many memory modules are installed (1…board slots). */
   setRamCount: (count: number) => void;
+  /** Fans per position; null returns to automatic placement of the whole pack. */
+  setFanLayout: (layout: FanLayout | null) => void;
   removeComponent: (category: ComponentCategory, id?: string) => void;
   loadSelection: (selection: BuildSelection, name?: string) => void;
   resetBuild: () => void;
@@ -147,6 +150,14 @@ export const useBuildStore = create<BuildState>()(
         if (ramCount === selection.ramCount) return;
         set({ selection: { ...selection, ramCount }, changeMeta: bump(changeMeta, "ram", false), lastChange: null });
         get().log("install", `Оперативная память: модулей ${selection.ramCount} → ${ramCount}`);
+      },
+
+      setFanLayout: (layout) => {
+        const { selection, changeMeta } = get();
+        const next = layout ? normalizeFanLayout(layout) : undefined;
+        if (JSON.stringify(next ?? null) === JSON.stringify(normalizeFanLayout(selection.fanLayout) ?? null)) return;
+        set({ selection: { ...selection, fanLayout: next ?? null }, changeMeta: bump(changeMeta, "fans", false), lastChange: null });
+        get().log("install", next ? `Вентиляторы: ${fanLayoutTotal(next)} шт. по выбранным местам` : "Вентиляторы: автоматическая раскладка");
       },
 
       removeComponent: (category, id) => {

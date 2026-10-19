@@ -12,6 +12,8 @@ export const selectionSchema = z.object({
   storage: z.array(z.string()).max(8),
   psu: z.string().nullable(),
   fans: z.string().nullable(),
+  // Fans per mount position; absent in older builds (whole pack, automatic placement).
+  fanLayout: z.partialRecord(z.enum(["front", "side", "top", "rear", "bottom"]), z.number().int().min(0).max(8)).nullable().optional(),
 });
 
 export const savedBuildSchema = z.object({

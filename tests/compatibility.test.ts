@@ -134,13 +134,16 @@ describe("compatibility engine", () => {
     expect(byRule({ ...sel, gpu: "asus-dual-rtx-4060" }, "gpu-slots")[0].status).toBe("compatible");
   });
 
-  it("detects a front-only radiator conflicting with a long GPU", () => {
-    // Fractal North takes 360 mm only at the front; a 304 mm card leaves no room for the radiator stack.
+  it("mounts radiators only on top, or on the side when the top cannot take them", () => {
+    // Fractal North takes 360 mm only at the front — radiators are not mounted there.
     const sel = { ...DEFAULT_SELECTION, cooler: "arctic-liquid-freezer-iii-360", gpu: "nvidia-founders-edition-rtx-5090" };
-    const fit = byRule(sel, "radiator-fit")[0];
-    expect(fit.status).toBe("incompatible");
-    expect(fit.detail).toContain("не помещается");
-    expect(byRule({ ...sel, gpu: "asus-dual-rtx-4060" }, "radiator-fit")[0].status).toBe("compatible");
+    const rad = byRule(sel, "radiator")[0];
+    expect(rad.status).toBe("incompatible");
+    expect(rad.detail).toContain("некуда поставить");
+    // Hyte Y60: top takes up to 280 mm, the side 360 mm — the 360 goes to the side.
+    const y60 = byRule({ ...sel, case: "hyte-y60" }, "radiator-fit")[0];
+    expect(y60.status).toBe("compatible");
+    expect(y60.detail).toContain("сбоку");
     // O11 Dynamic EVO mounts 360 mm on top — no conflict with the GPU.
     const o11 = byRule({ ...sel, case: "lian-li-o11-dynamic-evo" }, "radiator-fit")[0];
     expect(o11.status).toBe("compatible");

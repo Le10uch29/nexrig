@@ -8,17 +8,17 @@ import { useBuildStore, type MotionState } from "@/features/build-state/store";
 import type { Pose } from "@/features/installation/anchors";
 import { EXPLODE_OFFSETS, installPath, profileForPlacement, removalPath, type Keyframe } from "@/features/installation/motion";
 import type { Placement, PlacementState } from "@/features/installation/placement";
+import { useModelPreviews } from "@/features/models/preview";
 import { assetFor } from "@/features/models/registry";
 import { AssetModel } from "./AssetModel";
 import { boundsFor, type LocalBounds } from "./bounds";
 import { LabelAnchor } from "./labels";
 import { CoolerModel, CpuModel, FanPackModel, GpuModel, MotherboardModel, PsuModel, RamModel, StorageModel } from "./models";
 
-/** GLB from the model registry when available, otherwise the procedural model. */
+/** GLB from the model registry (or a Studio preview) when available, otherwise the procedural model. */
 function ModelFor({ p, spin }: { p: Placement; spin: boolean }) {
-  // Multi-part groups (RAM sticks, fan packs) and the AIO radiator stay procedural.
-  const asset = p.category === "ram" || p.category === "fans" || p.category === "cooler" ? undefined : assetFor(p.component);
-  return <AssetModel asset={asset} fallback={<ProceduralModel p={p} spin={spin} />} />;
+  const previews = useModelPreviews((s) => s.assets);
+  return <AssetModel asset={assetFor(p.component, previews)} fallback={<ProceduralModel p={p} spin={spin} />} />;
 }
 
 function ProceduralModel({ p, spin }: { p: Placement; spin: boolean }) {
@@ -100,6 +100,7 @@ export function SlotRenderer({ slotKey, placement, reducedMotion }: { slotKey: s
   const selected = useBuildStore((s) => s.selectedSlot === slotKey);
   const hovered = useBuildStore((s) => s.hoveredSlot === slotKey);
   const skipNonce = useBuildStore((s) => s.skipNonce);
+  const previews = useModelPreviews((s) => s.assets);
 
   function isInstant() {
     if (reducedMotion) return true;
@@ -285,7 +286,7 @@ export function SlotRenderer({ slotKey, placement, reducedMotion }: { slotKey: s
 
   if (!displayed) return <group ref={outer} />;
 
-  const bounds = boundsFor(displayed);
+  const bounds = boundsFor(displayed, previews);
   const conflict = displayed.state === "parked" && displayed.reason === "conflict";
   const labelPos: [number, number, number] = [bounds.center[0], bounds.center[1] + bounds.size[1] / 2 + 0.12, bounds.center[2]];
   if (displayed.category === "gpu" || displayed.category === "motherboard") labelPos[2] = bounds.center[2] + bounds.size[2] / 2;

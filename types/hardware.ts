@@ -84,6 +84,9 @@ export type Colorway = "black" | "white";
 /** Case fan mounting positions. */
 export type FanPosition = "front" | "top" | "rear" | "bottom" | "side";
 
+/** Case fans the user wants per mount position (sum = fans installed). */
+export type FanLayout = Partial<Record<FanPosition, number>>;
+
 export interface CaseSpec extends BaseComponent<"case"> {
   supportedBoards: BoardFormFactor[];
   supportedPsu: PsuFormFactor[];

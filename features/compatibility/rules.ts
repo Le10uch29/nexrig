@@ -1,7 +1,7 @@
-import { computeFit, type RadiatorOption } from "@/features/installation/fit";
+import { computeFit, RADIATOR_PREFERENCE, type RadiatorOption } from "@/features/installation/fit";
 import { analyzeBalance } from "./balance";
 import { adapterPinsFor, estimatePeakPower, recommendedPsuWattage } from "@/lib/hardware/power";
-import type { ResolvedBuild } from "@/lib/hardware/repository";
+import { fanCountOf, type ResolvedBuild } from "@/lib/hardware/repository";
 import { getMessages } from "@/lib/i18n";
 import type { CheckSeverity, CheckStatus, CompatibilityCheck } from "@/types/compatibility";
 import type { ComponentCategory, FanPosition } from "@/types/hardware";
@@ -302,6 +302,8 @@ function radiatorReason(o: RadiatorOption, gpuLen: number) {
       return m.radiatorFit.drives(pos);
     case "gpu-height":
       return m.radiatorFit.gpuHeight(pos, o.availableMm);
+    case "board":
+      return m.radiatorFit.board(pos, o.neededMm, o.availableMm);
     default:
       return m.radiatorFit.length(pos, o.neededMm, o.availableMm);
   }
@@ -316,9 +318,10 @@ export const coolerClearanceRule: Rule = (b) => {
     const categories: ComponentCategory[] = ["cooler", "case"];
     if (!known(cooler.radiatorMm)) return check("radiator", { rule: "radiator", status: "unknown", unknownReason: "missing-data", detail: m.radiator.unknown, categories });
     const r = cooler.radiatorMm;
-    const fits = pcCase.radiatorMounts.filter((mt) => mt.sizesMm.includes(r));
+    // Radiators go on top, or on the side mount when the top cannot take them (see RADIATOR_PREFERENCE).
+    const fits = pcCase.radiatorMounts.filter((mt) => RADIATOR_PREFERENCE.includes(mt.position) && mt.sizesMm.includes(r));
     if (!fits.length) {
-      const list = pcCase.radiatorMounts.map((mt) => `${POSITION_LABEL[mt.position]} ${join(mt.sizesMm)} мм`).join("; ") || "нет";
+      const list = pcCase.radiatorMounts.filter((mt) => RADIATOR_PREFERENCE.includes(mt.position)).map((mt) => `${POSITION_LABEL[mt.position]} ${join(mt.sizesMm)} мм`).join("; ") || "нет";
       return check("radiator", { rule: "radiator", status: "incompatible", detail: m.radiator.bad(r, list), resolution: m.radiator.resolution, categories });
     }
     const checks = [check("radiator", { rule: "radiator", status: "compatible", detail: m.radiator.ok(r, fits.map((mt) => POSITION_LABEL[mt.position]).join(", ")), categories })];
@@ -562,12 +565,13 @@ const listRu = (xs: string[]) => (xs.length <= 1 ? (xs[0] ?? "") : `${xs.slice(0
 export const fansRule: Rule = (b) => {
   const { fans, case: pcCase, gpu } = b;
   if (!fans || !pcCase) return null;
-  const ok = fans.count <= pcCase.fanSlots120;
+  const count = fanCountOf(b);
+  const ok = count <= pcCase.fanSlots120;
   const checks = [
     check("fans", {
       rule: "fans",
       status: ok ? "compatible" : "incompatible",
-      detail: ok ? m.fans.ok(fans.count, pcCase.fanSlots120) : m.fans.bad(fans.count, pcCase.fanSlots120),
+      detail: ok ? m.fans.ok(count, pcCase.fanSlots120) : m.fans.bad(count, pcCase.fanSlots120),
       resolution: m.fans.resolution,
       categories: ["fans", "case"],
     }),

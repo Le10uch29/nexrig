@@ -1,9 +1,9 @@
-import type { ResolvedBuild } from "@/lib/hardware/repository";
+import { fanCountOf, type ResolvedBuild } from "@/lib/hardware/repository";
 import type { CompatibilityCheck } from "@/types/compatibility";
 import type { ComponentCategory, HardwareComponent } from "@/types/hardware";
 import { ramSlotsFor, resolveAnchors, type AnchorMap, type Pose } from "./anchors";
 import { computeFit, relativeTo } from "./fit";
-import { caseGeometry, type Vec3 } from "./layout";
+import { caseFeet, caseGeometry, type Vec3 } from "./layout";
 
 export type SlotKey = Exclude<ComponentCategory, "storage"> | `storage:${string}`;
 
@@ -77,12 +77,16 @@ const LOCAL_MIN_Y: Partial<Record<ComponentCategory, (c: HardwareComponent) => n
   storage: (c) => (c.category === "storage" && c.interface === "SATA" ? 0 : -0.12),
 };
 
-export function benchPose(category: ComponentCategory, component: HardwareComponent, caseDepth: number | null, index = 0): Pose {
+/**
+ * Spot on the assembly mat, in the case frame. `floorY` is the mat's height in that frame: the case
+ * stands on its feet, so the mat is below the case origin by the feet height.
+ */
+export function benchPose(category: ComponentCategory, component: HardwareComponent, caseDepth: number | null, index = 0, floorY = 0): Pose {
   const originX = (caseDepth ?? 4.4) / 2 + 1.1;
   const spot = BENCH_SPOTS[category];
   const minY = LOCAL_MIN_Y[category]?.(component) ?? 0;
   return {
-    position: [originX + spot[0], -minY + 0.02 + index * 0.12, spot[2] + index * 0.35],
+    position: [originX + spot[0], floorY - minY + 0.02 + index * 0.12, spot[2] + index * 0.35],
     rotation: [0, -0.45, 0],
   };
 }
@@ -101,6 +105,7 @@ const WAITING = {
 
 export function computePlacements(b: ResolvedBuild, checks: CompatibilityCheck[]): Placement[] {
   const caseDepth = b.case ? caseGeometry(b.case).depth : null;
+  const floorY = b.case ? -caseFeet(b.case).height : 0;
   const anchors: AnchorMap = b.case ? resolveAnchors(b.case, b.motherboard) : {};
   const fit = computeFit(b);
   // Dual-chamber cases: PSU and SATA drives live behind the tray and go in from behind.
@@ -115,7 +120,7 @@ export function computePlacements(b: ResolvedBuild, checks: CompatibilityCheck[]
     extra: Partial<Placement> = {},
     benchIndex = 0,
   ): Placement => {
-    const bench = benchPose(component.category, component, caseDepth, benchIndex);
+    const bench = benchPose(component.category, component, caseDepth, benchIndex, floorY);
     const block = blockingCheck(component.category, checks);
     let p: Placement;
     if (block) {
@@ -207,10 +212,11 @@ export function computePlacements(b: ResolvedBuild, checks: CompatibilityCheck[]
           rotation: a.rotation,
         }))
       : [];
-    const benchChildren = Array.from({ length: b.fans.count }, (_, i) => ({ offset: [0, 0, i * 0.35] as Vec3, rotation: [0, 0, 0] as Vec3 }));
+    const fanCount = fanCountOf(b);
+    const benchChildren = Array.from({ length: fanCount }, (_, i) => ({ offset: [0, 0, i * 0.35] as Vec3, rotation: [0, 0, 0] as Vec3 }));
     const target = first ? { position: first.position, rotation: [0, 0, 0] as Vec3 } : undefined;
     const p = push("fans", b.fans, target, b.case ? null : WAITING.case, {
-      children: mountedChildren.length === b.fans.count ? mountedChildren : benchChildren,
+      children: mountedChildren.length === fanCount ? mountedChildren : benchChildren,
     });
     if (p.state === "parked") p.children = benchChildren;
   }

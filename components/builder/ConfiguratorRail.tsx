@@ -4,11 +4,12 @@ import { useBuildDerived } from "@/features/build-state/derived";
 import { useBuildStore } from "@/features/build-state/store";
 import { usePrice } from "@/features/settings/currency";
 import { INSTALL_ORDER, type Placement } from "@/features/installation/placement";
+import { fanPacksOf } from "@/lib/hardware/repository";
 import { useMessages } from "@/lib/i18n";
 import type { ComponentCategory, HardwareComponent } from "@/types/hardware";
-import { ComponentThumb } from "@/components/hardware/ComponentThumb";
 import { IconChevron, IconPlus, IconSwap, IconTrash } from "@/components/ui/icons";
 import { cx } from "@/components/ui/primitives";
+import { CategoryIcon } from "./category-icons";
 
 type Status = "installed" | "installing" | "conflict" | "waiting" | "empty";
 
@@ -39,9 +40,24 @@ function useSteps() {
   return { steps, statusOf, motion };
 }
 
+/** Round category glyph with the install status as a dot; violet glow when active. */
+function StepIcon({ category, status, active }: { category: ComponentCategory; status: Status; active: boolean }) {
+  return (
+    <span
+      className={cx(
+        "relative grid size-10 shrink-0 place-items-center rounded-full border transition-[border-color,box-shadow,color,background-color]",
+        active ? "border-violet bg-violet/15 text-fg shadow-[0_0_18px_-2px_rgb(141_125_255/0.55)]" : "border-line-strong bg-bg-0/50 text-fg-2 group-hover:border-fg-3 group-hover:text-fg",
+      )}
+    >
+      <CategoryIcon category={category} size={17} />
+      <span className={cx("absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full ring-2 ring-bg-0", STATUS_DOT[status])} aria-hidden />
+    </span>
+  );
+}
+
 /**
  * The configurator: every part of the build in physical installation order, with its install
- * state, price and actions. Replaces the former side list and bottom timeline (one place, not two).
+ * state, price and actions. On desktop it floats over the 3D scene as a showroom-style list.
  */
 export function ConfiguratorRail({ collapsed = false }: { collapsed?: boolean }) {
   const t = useMessages();
@@ -69,64 +85,56 @@ export function ConfiguratorRail({ collapsed = false }: { collapsed?: boolean })
     waiting: t.timeline.waiting,
     empty: t.timeline.empty,
   };
+  const isActive = (s: Step) => (rightOpen && inspector === "catalog" && catalogCategory === s.category && (!s.component || selected === null)) || selected === s.key;
 
   if (collapsed) {
     return (
-      <aside className="scroll-thin flex h-full min-h-0 flex-col items-center gap-1.5 overflow-y-auto border-r border-line bg-bg-1 py-3" aria-label="Комплектующие">
-        <button type="button" onClick={() => setView({ leftPanel: true })} title="Развернуть комплектующие" aria-label="Развернуть комплектующие" className="mb-1 grid size-9 place-items-center rounded-[var(--radius-sm)] text-fg-2 hover:bg-[var(--hover-bg)] hover:text-fg">
-          <IconChevron />
+      <nav className="scroll-thin flex max-h-full flex-col items-center gap-2 overflow-y-auto py-1" aria-label="Комплектующие">
+        <button type="button" onClick={() => setView({ leftPanel: true })} title="Показать названия деталей" aria-label="Развернуть комплектующие" className="mb-1 grid size-8 place-items-center rounded-full border border-line bg-bg-0/60 text-fg-2 backdrop-blur-md hover:border-line-strong hover:text-fg">
+          <IconChevron width={14} height={14} />
         </button>
         {steps.map((s) => {
           const st = statusOf(s);
           return (
-            <button key={s.key} type="button" onClick={() => open(s)} title={`${t.categories[s.category]}: ${s.component?.name ?? label[st]}`} aria-label={`${t.categories[s.category]}: ${s.component?.name ?? label[st]}`} className="relative rounded-[var(--radius-md)] hover:ring-1 hover:ring-violet/40">
-              <ComponentThumb component={s.component} category={s.category} size={38} />
-              <span className={cx("absolute -right-0.5 -bottom-0.5 size-2.5 rounded-full ring-2 ring-bg-1", STATUS_DOT[st])} aria-hidden />
+            <button key={s.key} type="button" onClick={() => open(s)} title={`${t.categories[s.category]}: ${s.component?.name ?? label[st]}`} aria-label={`${t.categories[s.category]}: ${s.component?.name ?? label[st]}`} className="group rounded-full focus-visible:outline-2 focus-visible:outline-violet">
+              <StepIcon category={s.category} status={st} active={isActive(s)} />
             </button>
           );
         })}
-      </aside>
+      </nav>
     );
   }
 
   return (
-    <aside className="flex h-full min-h-0 flex-col border-line bg-bg-1 lg:border-r" aria-label="Комплектующие">
-      <div className="flex items-center justify-between gap-2 px-4 pt-4 pb-2">
+    <nav className="flex max-h-full min-h-0 flex-col" aria-label="Комплектующие">
+      <div className="flex items-center justify-between gap-2 px-4 pt-4 pb-2 lg:px-1 lg:pt-0">
         <div>
           <h2 className="text-[15px] font-semibold">Комплектующие</h2>
           <p className="text-[12px] text-fg-3">В порядке установки</p>
         </div>
-        <button type="button" onClick={() => setView({ leftPanel: false })} title="Свернуть" aria-label="Свернуть комплектующие" className="hidden size-8 place-items-center rounded-[var(--radius-sm)] text-fg-3 hover:bg-[var(--hover-bg)] hover:text-fg lg:grid">
-          <IconChevron className="rotate-180" />
+        <button type="button" onClick={() => setView({ leftPanel: false })} title="Только иконки" aria-label="Свернуть комплектующие" className="hidden size-8 place-items-center rounded-full border border-line bg-bg-0/60 text-fg-3 backdrop-blur-md hover:border-line-strong hover:text-fg lg:grid">
+          <IconChevron width={14} height={14} className="rotate-180" />
         </button>
       </div>
-      <ol className="scroll-thin min-h-0 flex-1 space-y-1 overflow-y-auto px-2 pb-3">
-        {steps.map((s, i) => {
+      <ol className="scroll-thin min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pb-3 lg:px-0 lg:pr-1 lg:pb-0">
+        {steps.map((s) => {
           const st = statusOf(s);
-          const active = (rightOpen && inspector === "catalog" && catalogCategory === s.category && !s.component) || selected === s.key;
-          const qty = s.category === "ram" ? resolved.ramCount : 1;
+          const active = isActive(s);
+          const qty = s.category === "ram" ? resolved.ramCount : s.category === "fans" ? fanPacksOf(resolved) : 1;
           return (
-            <li key={s.key} className={cx("group relative flex items-center gap-3 rounded-[var(--radius-lg)] p-2 transition-colors", active ? "bg-[var(--selected-bg)] ring-1 ring-[var(--selected-border)]" : "hover:bg-[var(--hover-bg)]")}>
-              <button type="button" onClick={() => open(s)} className="flex min-w-0 flex-1 items-center gap-3 text-left" title={s.component ? t.timeline.select : t.timeline.goToStep}>
-                <span className="relative">
-                  <ComponentThumb component={s.component} category={s.category} size={48} />
-                  <span className="num absolute -top-1 -left-1 grid size-[18px] place-items-center rounded-full bg-bg-0 text-[10px] text-fg-3 ring-1 ring-line">{i + 1}</span>
-                </span>
+            <li key={s.key} className={cx("group relative flex items-center gap-1 rounded-full transition-colors", active ? "bg-violet/10" : "hover:bg-[var(--hover-bg)]")}>
+              <button type="button" onClick={() => open(s)} className="flex min-w-0 flex-1 items-center gap-3 rounded-full py-1 pr-2 pl-1 text-left focus-visible:outline-2 focus-visible:outline-violet" title={s.component ? t.timeline.select : t.timeline.goToStep}>
+                <StepIcon category={s.category} status={st} active={active} />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[11.5px] text-fg-3">{t.categories[s.category]}</span>
-                  <span className={cx("block truncate text-[14px] leading-snug font-medium", !s.component && "text-fg-3")}>
-                    {s.component ? `${qty > 1 ? `${qty} × ` : ""}${s.component.name}` : "Выбрать"}
+                  <span className={cx("block truncate text-[13.5px] leading-tight font-medium", active ? "text-fg" : "text-fg-2 group-hover:text-fg")}>{t.categories[s.category]}</span>
+                  <span className="block truncate text-[12px] leading-snug text-fg-3">
+                    {s.component ? `${qty > 1 ? `${qty} × ` : ""}${s.component.name}` : <span className={STATUS_TEXT[st]}>Выбрать</span>}
                   </span>
-                  <span className="mt-0.5 flex items-center gap-2 text-[12px]">
-                    {s.component && <span className="num text-fg-2">{formatPrice(s.component.price.amountRub * qty)}</span>}
-                    <span className={cx("flex items-center gap-1", STATUS_TEXT[st])}>
-                      <span className={cx("size-1.5 rounded-full", STATUS_DOT[st])} aria-hidden />
-                      {label[st]}
-                    </span>
-                  </span>
+                  {(st === "conflict" || st === "waiting" || st === "installing") && <span className={cx("block text-[11.5px] leading-snug", STATUS_TEXT[st])}>{label[st]}</span>}
                 </span>
+                {s.component && <span className="num shrink-0 text-[11.5px] text-fg-3 group-hover:hidden group-focus-within:hidden max-lg:hidden">{formatPrice(s.component.price.amountRub * qty)}</span>}
               </button>
-              <div className="flex flex-col gap-1 opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100 max-lg:opacity-100">
+              <div className="hidden shrink-0 gap-0.5 pr-1.5 group-focus-within:flex group-hover:flex max-lg:flex">
                 <button
                   type="button"
                   onClick={() => {
@@ -135,7 +143,7 @@ export function ConfiguratorRail({ collapsed = false }: { collapsed?: boolean })
                   }}
                   aria-label={`${s.component ? t.timeline.replace : "Выбрать"}: ${t.categories[s.category]}`}
                   title={s.component ? t.timeline.replace : "Выбрать"}
-                  className="grid size-7 place-items-center rounded-[var(--radius-sm)] text-fg-3 hover:bg-panel-3 hover:text-fg"
+                  className="grid size-7 place-items-center rounded-full text-fg-3 hover:bg-panel-3 hover:text-fg"
                 >
                   {s.component ? <IconSwap width={14} height={14} /> : <IconPlus width={14} height={14} />}
                 </button>
@@ -146,7 +154,7 @@ export function ConfiguratorRail({ collapsed = false }: { collapsed?: boolean })
                     onClick={() => removeComponent(s.category, s.component!.id)}
                     aria-label={`${t.timeline.remove}: ${s.component.name}`}
                     title={t.timeline.remove}
-                    className="grid size-7 place-items-center rounded-[var(--radius-sm)] text-fg-3 hover:bg-bad-soft hover:text-bad disabled:opacity-30"
+                    className="grid size-7 place-items-center rounded-full text-fg-3 hover:bg-bad-soft hover:text-bad disabled:opacity-30"
                   >
                     <IconTrash width={14} height={14} />
                   </button>
@@ -156,6 +164,6 @@ export function ConfiguratorRail({ collapsed = false }: { collapsed?: boolean })
           );
         })}
       </ol>
-    </aside>
+    </nav>
   );
 }

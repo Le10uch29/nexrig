@@ -1,4 +1,4 @@
-import type { ResolvedBuild } from "./repository";
+import { fanCountOf, type ResolvedBuild } from "./repository";
 
 /** Allowances for parts without published power figures (W). Conservative round numbers. */
 export const POWER_ALLOWANCE = {
@@ -22,7 +22,7 @@ export function estimatePeakPower(b: ResolvedBuild): number | null {
   if (b.gpu) w += b.gpu.boardPowerW;
   if (b.ram) w += b.ramCount * POWER_ALLOWANCE.perRamModule;
   for (const s of b.storage) w += s.kind === "hdd" ? POWER_ALLOWANCE.perHdd : s.interface === "NVMe" ? POWER_ALLOWANCE.perNvme : POWER_ALLOWANCE.perSata;
-  if (b.fans) w += b.fans.count * POWER_ALLOWANCE.perFan;
+  if (b.fans) w += fanCountOf(b) * POWER_ALLOWANCE.perFan;
   if (b.cooler?.kind === "aio") w += POWER_ALLOWANCE.aioPump;
   return Math.round(w);
 }

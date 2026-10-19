@@ -9,7 +9,7 @@
 import { useFrame } from "@react-three/fiber";
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
-import { BOARD_LAYOUTS, BOARD_THICKNESS, caseGeometry, DIMM_LENGTH, MM, PCIE_SLOT_RANGE, PSU_DIMENSIONS, SLOT_PITCH, type Vec3 } from "@/features/installation/layout";
+import { BOARD_LAYOUTS, BOARD_THICKNESS, caseFeet, caseGeometry, DIMM_LENGTH, MM, PCIE_SLOT_RANGE, PSU_DIMENSIONS, SLOT_PITCH, type Vec3 } from "@/features/installation/layout";
 import type { CaseSpec, CoolerSpec, CpuSpec, FanSpec, GpuSpec, MotherboardSpec, PsuSpec, RamSpec, StorageSpec } from "@/types/hardware";
 import type { CaseMode } from "@/features/build-state/store";
 import type { Pose } from "@/features/installation/anchors";
@@ -407,10 +407,51 @@ export function CaseModel({ spec, mode }: { spec: CaseSpec; mode: CaseMode }) {
       {mode !== "open" &&
         [0.2, 0.8].map((f) => <Cyl key={f} r={0.035} h={0.05} position={[-D / 2 - 0.025, H * f, W / 2 - 0.06]} axis="x" color={NICKEL} metalness={0.85} roughness={0.3} />)}
 
-      {/* feet */}
-      {[-1, 1].flatMap((sx) =>
-        [-1, 1].map((sz) => <Cyl key={`${sx}${sz}`} r={0.13} h={0.08} position={[sx * (D / 2 - 0.4), -0.04, sz * (W / 2 - 0.3)]} axis="y" color={DARK} roughness={0.9} />),
-      )}
+      <CaseFeet spec={spec} />
+    </group>
+  );
+}
+
+/** Brushed metal of the feet: lighter than the case so they read against a dark podium. */
+const FEET_METAL = "#4a4f5a";
+
+function CaseFeet({ spec }: { spec: CaseSpec }) {
+  const { width: W, depth: D } = caseGeometry(spec);
+  const { kind, height: h } = caseFeet(spec);
+  const corners = [-1, 1].flatMap((sx) => [-1, 1].map((sz) => [sx, sz] as const));
+  if (kind === "rails") {
+    // Two rails front-to-back with rubber end caps.
+    return (
+      <group>
+        {[-1, 1].map((sz) => (
+          <group key={sz} position={[0, -h / 2, sz * (W / 2 - 0.28)]}>
+            <Box size={[D - 0.3, h * 0.72, 0.22]} position={[0, h * 0.14, 0]} color={FEET_METAL} metalness={0.75} roughness={0.3} />
+            {[-1, 1].map((sx) => (
+              <Box key={sx} size={[0.32, h * 0.3, 0.24]} position={[sx * (D / 2 - 0.32), -h * 0.35, 0]} color="#0b0c0f" roughness={0.95} />
+            ))}
+          </group>
+        ))}
+      </group>
+    );
+  }
+  if (kind === "round") {
+    return (
+      <group>
+        {corners.map(([sx, sz]) => (
+          <Cyl key={`${sx}${sz}`} r={0.11} h={h} position={[sx * (D / 2 - 0.3), -h / 2, sz * (W / 2 - 0.25)]} axis="y" color={FEET_METAL} metalness={0.6} roughness={0.45} />
+        ))}
+      </group>
+    );
+  }
+  // Tower: oval rubber pads on a short plastic base.
+  return (
+    <group>
+      {corners.map(([sx, sz]) => (
+        <group key={`${sx}${sz}`} position={[sx * (D / 2 - 0.45), 0, sz * (W / 2 - 0.3)]}>
+          <Box size={[0.55, h * 0.55, 0.26]} position={[0, -h * 0.275, 0]} color={FEET_METAL} metalness={0.7} roughness={0.35} />
+          <Box size={[0.48, h * 0.45, 0.2]} position={[0, -h * 0.775, 0]} color="#0b0c0f" roughness={0.95} />
+        </group>
+      ))}
     </group>
   );
 }

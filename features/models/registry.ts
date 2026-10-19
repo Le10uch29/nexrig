@@ -1,5 +1,5 @@
 import type { Vec3 } from "@/features/installation/layout";
-import type { HardwareComponent } from "@/types/hardware";
+import type { ComponentCategory, HardwareComponent } from "@/types/hardware";
 
 /**
  * Unified 3D model description. A component renders a GLB/glTF when an asset with `modelUrl`
@@ -36,9 +36,31 @@ export interface ModelAsset {
  */
 export const MODEL_ASSETS: Record<string, ModelAsset> = {};
 
-export function assetFor(component: HardwareComponent): ModelAsset | undefined {
-  const exact = MODEL_ASSETS[component.id];
-  if (exact) return exact;
-  if (component.category === "gpu") return MODEL_ASSETS[`gpu:${component.chip}`] ?? MODEL_ASSETS[`gpu:${component.line}`];
-  return MODEL_ASSETS[`${component.category}:generic`];
+/**
+ * Categories whose single-object model can be replaced by a GLB. RAM kits, fan packs and coolers
+ * (with an AIO radiator placed separately) are multi-part and stay procedural for now.
+ */
+export const GLB_CATEGORIES: readonly ComponentCategory[] = ["case", "motherboard", "cpu", "gpu", "storage", "psu"];
+
+export function supportsAsset(category: ComponentCategory) {
+  return GLB_CATEGORIES.includes(category);
+}
+
+/** Registry keys tried for a component, most specific first. */
+export function assetKeysFor(component: HardwareComponent): string[] {
+  if (component.category === "gpu") return [component.id, `gpu:${component.chip}`, `gpu:${component.line}`];
+  return [component.id, `${component.category}:generic`];
+}
+
+/**
+ * The asset for a component. `extra` (temporary previews from Studio) is checked before the
+ * bundled registry; categories without GLB support always return undefined.
+ */
+export function assetFor(component: HardwareComponent, extra?: Record<string, ModelAsset>): ModelAsset | undefined {
+  if (!supportsAsset(component.category)) return undefined;
+  for (const key of assetKeysFor(component)) {
+    const hit = extra?.[key] ?? MODEL_ASSETS[key];
+    if (hit) return hit;
+  }
+  return undefined;
 }

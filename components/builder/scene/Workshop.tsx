@@ -17,7 +17,7 @@ const WALL_Z = -5.4;
 
 /* ------------------------------------------------------------------ canvas textures */
 
-function useCanvasTexture(draw: (g: CanvasRenderingContext2D, w: number, h: number) => void, w: number, h: number, repeat: [number, number] = [1, 1]) {
+export function useCanvasTexture(draw: (g: CanvasRenderingContext2D, w: number, h: number) => void, w: number, h: number, repeat: [number, number] = [1, 1]) {
   const tex = useMemo(() => {
     const canvas = document.createElement("canvas");
     canvas.width = w;
@@ -86,7 +86,7 @@ function drawPegboard(g: CanvasRenderingContext2D, w: number, h: number) {
 }
 
 /** Generic dashboard UI for the desk monitor (no product branding). */
-function drawDashboard(g: CanvasRenderingContext2D, w: number, h: number) {
+export function drawDashboard(g: CanvasRenderingContext2D, w: number, h: number) {
   const grd = g.createLinearGradient(0, 0, w, h);
   grd.addColorStop(0, "#0d1120");
   grd.addColorStop(1, "#141a30");
@@ -120,7 +120,7 @@ function drawDashboard(g: CanvasRenderingContext2D, w: number, h: number) {
 }
 
 /** Seamless scrolling frame-time line for the second screen. */
-function drawGraph(g: CanvasRenderingContext2D, w: number, h: number) {
+export function drawGraph(g: CanvasRenderingContext2D, w: number, h: number) {
   g.fillStyle = "#0a0f1a";
   g.fillRect(0, 0, w, h);
   g.strokeStyle = "rgba(127,139,173,0.18)";
@@ -142,7 +142,7 @@ function drawGraph(g: CanvasRenderingContext2D, w: number, h: number) {
   g.stroke();
 }
 
-function drawBoxLabel(color: string, accent: string) {
+function drawBoxLabel(color: string, accent: string, title = "GRAPHICS", subtitle = "16 GB · PCIe") {
   return (g: CanvasRenderingContext2D, w: number, h: number) => {
     g.fillStyle = color;
     g.fillRect(0, 0, w, h);
@@ -150,9 +150,9 @@ function drawBoxLabel(color: string, accent: string) {
     g.fillRect(0, h * 0.62, w, h * 0.14);
     g.fillStyle = "rgba(255,255,255,0.85)";
     g.font = `bold ${Math.round(h * 0.16)}px sans-serif`;
-    g.fillText("GRAPHICS", w * 0.08, h * 0.32);
+    g.fillText(title, w * 0.08, h * 0.32);
     g.font = `${Math.round(h * 0.1)}px sans-serif`;
-    g.fillText("16 GB · PCIe", w * 0.08, h * 0.5);
+    g.fillText(subtitle, w * 0.08, h * 0.5);
   };
 }
 
@@ -170,7 +170,7 @@ function Box({ size, position, color, rotation, roughness = 0.7, metalness = 0.1
 /* ------------------------------------------------------------------ props */
 
 /** Small display PC on a shelf: glass side, three RGB fans with a slow hue drift. */
-function ShelfPC({ position, color, scale = 1, hue = 0.72, animate }: { position: [number, number, number]; color: string; scale?: number; hue?: number; animate: boolean }) {
+export function ShelfPC({ position, color, scale = 1, hue = 0.72, animate }: { position: [number, number, number]; color: string; scale?: number; hue?: number; animate: boolean }) {
   const fans = useRef<THREE.Group>(null);
   const ringMat = useMemo(() => new THREE.MeshStandardMaterial({ color: "#111111", emissive: new THREE.Color().setHSL(hue, 0.9, 0.5), emissiveIntensity: 1.3 }), [hue]);
   useEffect(() => () => ringMat.dispose(), [ringMat]);
@@ -235,7 +235,7 @@ function Monitor({ position, rotationY = 0, width = 5.6, screen, emissive = 0.9,
   );
 }
 
-function PartsBox({ position, size, color, accent, rotationY = 0, label }: { position: [number, number, number]; size: [number, number, number]; color: string; accent: string; rotationY?: number; label?: THREE.Texture }) {
+export function PartsBox({ position, size, color, accent, rotationY = 0, label }: { position: [number, number, number]; size: [number, number, number]; color: string; accent: string; rotationY?: number; label?: THREE.Texture }) {
   return (
     <group position={position} rotation={[0, rotationY, 0]}>
       <mesh position={[0, size[1] / 2, 0]}>

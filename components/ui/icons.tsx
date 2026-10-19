@@ -21,6 +21,13 @@ export const IconSearch = (p: P) => (
     <path d="m20 20-4.2-4.2" />
   </svg>
 );
+export const IconImage = (p: P) => (
+  <svg {...base(p)}>
+    <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+    <circle cx="9" cy="9.5" r="1.6" />
+    <path d="m20.5 15.5-4.5-4.5-9 8.5" />
+  </svg>
+);
 export const IconCube = (p: P) => (
   <svg {...base(p)}>
     <path d="M12 3 4 7.5v9L12 21l8-4.5v-9L12 3Z" />
